@@ -7,3 +7,6 @@ window.addEventListener('onFailedToGetDirector', function () {
 window.addEventListener('onCheatProgress', function (event) {
     if (chrome && chrome.runtime) chrome.runtime.sendMessage({ action: 'onCheatProgress', data: event.detail });
 });
+window.addEventListener('onSymbolAssets', function (event) {
+    if (chrome && chrome.runtime) chrome.runtime.sendMessage({ action: 'onSymbolAssets', data: event.detail });
+});

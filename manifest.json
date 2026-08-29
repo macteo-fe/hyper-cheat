@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "hyber-cheat",
-  "version": "3.3",
+  "version": "3.5",
   "description": "Form SaiGon1975 With Love",
   "devtools_page": "src/devtools/DevToolsPanel.html",
   "icons": {
@@ -16,6 +16,16 @@
   ],
   "host_permissions": [
     "<all_urls>"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/utils/EvalCheatScript.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
   ],
   "content_scripts": [
     {

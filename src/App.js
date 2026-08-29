@@ -14,6 +14,8 @@ export class App {
         this.cheatController = new CheatController({ tabId, database });
         this.formController = new FormController({ tabId, database, cheatController: this.cheatController });
         this.table = new TableController({ tabId, database, cheatController: this.cheatController, formController: this.formController });
+        this.symbolAssets = {};
+        this._symbolExportTrying = false;
         this.start();
     }
     start() {
@@ -37,12 +39,13 @@ export class App {
         }
     }
     handleMessage = (message, sender) => {
-        if (message.action === "onGameConfigResponse" && this.tabId == sender.tab.id) {
+        if (sender?.tab?.id !== this.tabId) return;
+        if (message.action === "onGameConfigResponse") {
             this.updateGameInfo(message.data);
         }
-        // if (message.action === "onFailedToGetDirector" && this.tabId == sender.tab.id) {
-        //     this.resetGameInfo();
-        // }
+        if (message.action === "onSymbolAssets") {
+            this.handleSymbolAssets(message.data);
+        }
     }
     gameLoop() {
         this.update();
@@ -67,6 +70,8 @@ export class App {
         this.userId = null;
         this.currency = null;
         this.isOverwriting = false;
+        this.symbolAssets = {};
+        this._symbolExportTrying = false;
 
         this.labelMessage.style.display = 'block';
         this.viewContainer.style.display = 'none';
@@ -76,6 +81,7 @@ export class App {
 
         this.table.clearTable();
         this.formController.clearForm();
+        this.formController.setSymbolAssets({});
         this.cheatController.resetCheatState();
     }
     updateGameInfo(data) {
@@ -95,6 +101,37 @@ export class App {
         this.table.updateConfig({ gameId: this.gameId, userId: this.userId, currency: this.currency });
         this.table.renderTable();
         this.isInit = true;
+        this.requestSymbolAssets();
+    }
+
+    handleSymbolAssets(data) {
+        if (!data?.symbols) return;
+        if (data.gameId && this.gameId && String(data.gameId) !== String(this.gameId)) return;
+        this.symbolAssets = data.symbols;
+        this.formController.setSymbolAssets(this.symbolAssets);
+    }
+
+    async requestSymbolAssets() {
+        if (this._symbolExportTrying) return;
+        this._symbolExportTrying = true;
+        for (let attempt = 0; attempt < 40; attempt++) {
+            if (Object.keys(this.symbolAssets || {}).length) {
+                this._symbolExportTrying = false;
+                return;
+            }
+            try {
+                const result = await this.evalCommand('window.cheatScript && window.cheatScript.exportSymbolAssets()');
+                if (result?.ok && result.count > 0) {
+                    // Full payload arrives via onSymbolAssets message.
+                    this._symbolExportTrying = false;
+                    return;
+                }
+            } catch (_) {
+                // retry while table/symbols are still loading
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        this._symbolExportTrying = false;
     }
 
     async checkOverwrite() {
@@ -105,11 +142,17 @@ export class App {
         if (this.isOverwriting) return;
         this.isOverwriting = true;
         try {
-            const response = await fetch(chrome.runtime.getURL("src/utils/EvalCheatScript.js"));
-            const code = await response.text();
-            await this.evalCommand(code);
+            const alreadyLoaded = await this.evalCommand('!!(window.EvalCheatScript || window.cheatScript)');
+            if (!alreadyLoaded) {
+                await chrome.scripting.executeScript({
+                    target: { tabId: this.tabId },
+                    world: 'MAIN',
+                    files: ['src/utils/EvalCheatScript.js'],
+                });
+            }
         } catch (error) {
             this.isOverwriting = false;
+            console.error('Error injecting EvalCheatScript', error);
             this.logMessage(`Error in overwrite cheat!`);
         }
     }

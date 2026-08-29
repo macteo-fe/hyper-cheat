@@ -5,6 +5,7 @@ export class FormCard {
         this.data = {};
         this.formText = '';
         this.isRender = false;
+        this.symbolAssets = {};
         this.elements = {
             card: this._createDomElement('div', 'card mb-0 form-card'),
             header: {
@@ -69,6 +70,10 @@ export class FormCard {
         return button;
     }
 
+
+    setSymbolAssets(symbols = {}) {
+        this.symbolAssets = symbols || {};
+    }
 
     //handle action
     addEventListeners() {
@@ -302,6 +307,15 @@ export class FormCard {
         }
     }
 
+    _resolveSymbolImage(symbolValue) {
+        if (!symbolValue || !this.symbolAssets) return null;
+        const raw = String(symbolValue).trim();
+        if (!raw) return null;
+        if (this.symbolAssets[raw]) return this.symbolAssets[raw];
+        const base = raw.split('_')[0].split('-')[0];
+        return this.symbolAssets[base] || null;
+    }
+
     _buildMatrix(matrixData, format) {
         if (!matrixData || !format) return '';
         try {
@@ -309,26 +323,34 @@ export class FormCard {
             const formatValues = format.split(',').map(Number);
             const matrix = [];
             let currentIndex = 0;
-            const maxColumns = Math.max(...formatValues);
+            const maxRows = Math.max(...formatValues);
 
             for (const rowLength of formatValues) {
-                const row = [];
-                for (let col = 0; col < rowLength; col++) {
+                const col = [];
+                for (let row = 0; row < rowLength; row++) {
                     const value = matrixValues[currentIndex++];
-                    row.push(value ? value.split('-')[0] : null);
+                    col.push(value ? value.split('-')[0] : null);
                 }
-                matrix.push(row);
+                matrix.push(col);
             }
 
-            let output = 'Matrix Table <br/><pre>\n';
-            for (let row = 0; row < maxColumns; row++) {
+            let output = '<div class="matrix-preview-title">Matrix Preview</div>';
+            output += '<div class="matrix-preview-grid">';
+            for (let row = 0; row < maxRows; row++) {
+                output += '<div class="matrix-preview-row">';
                 for (let col = 0; col < matrix.length; col++) {
-                    const value = matrix[col][row] || ' ';
-                    output += value.padEnd(2, ' ') + ' | ';
+                    const value = matrix[col][row] || '';
+                    const image = this._resolveSymbolImage(value);
+                    output += '<div class="matrix-preview-cell">';
+                    if (image) {
+                        output += `<img src="${image}" alt="${value}" />`;
+                    }
+                    output += `<span>${value || '·'}</span>`;
+                    output += '</div>';
                 }
-                output += '\n';
+                output += '</div>';
             }
-            output += '</pre>';
+            output += '</div>';
             return output;
         } catch {
             return '';

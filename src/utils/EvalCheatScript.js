@@ -205,6 +205,179 @@
                 }));
             }
 
+            findSymbolResourceManager() {
+                const canvas = this.cc?.find?.('Canvas');
+                if (!canvas?.getComponentsInChildren) return null;
+                const comps = canvas.getComponentsInChildren('SlotSymbolResourceManager') || [];
+                if (!comps.length) return null;
+                // Prefer a manager whose staticFrameAssets is already filled (post-onLoad).
+                const ready = comps.filter((c) => Object.keys(c?.staticFrameAssets || {}).length > 0);
+                const pool = ready.length ? ready : comps;
+                return pool.reduce((best, current) => {
+                    const bestCount = this._getSymbolManagerCount(best);
+                    const currentCount = this._getSymbolManagerCount(current);
+                    return currentCount > bestCount ? current : best;
+                });
+            }
+
+            _getSymbolManagerCount(manager) {
+                if (!manager) return 0;
+                return Object.keys(manager.staticFrameAssets || {}).length
+                    || (Array.isArray(manager.symbolSfList) ? manager.symbolSfList.length : 0);
+            }
+
+            exportSymbolAssets() {
+                try {
+                    const manager = this.findSymbolResourceManager();
+                    if (!manager) {
+                        return { ok: false, count: 0, reason: 'manager-not-found' };
+                    }
+
+                    // Only use already-initialized runtime maps / serialized props — never call component methods.
+                    const staticMap = manager.staticFrameAssets || {};
+                    const list = Array.isArray(manager.symbolSfList) ? manager.symbolSfList : [];
+                    const readyCodes = Object.keys(staticMap);
+                    if (!readyCodes.length) {
+                        return { ok: false, count: 0, reason: 'assets-not-ready' };
+                    }
+
+                    const symbols = {};
+                    readyCodes.forEach((code) => {
+                        const frame = staticMap[code]
+                            || list.find((item) => item?.symbolCode === code)?.symbolSf
+                            || null;
+                        const dataUrl = this.spriteFrameToDataURL(frame);
+                        if (dataUrl) symbols[code] = dataUrl;
+                    });
+
+                    const gameId = this.isBaseV2
+                        ? this.director?.gameConfig?.GAME_ID
+                        : this.director?.node?.config?.GAME_ID;
+
+                    window.dispatchEvent(new CustomEvent('onSymbolAssets', {
+                        detail: {
+                            gameId,
+                            symbols,
+                            codes: Object.keys(symbols),
+                        },
+                    }));
+
+                    console.log(`CHEAT_TOOL: exported ${Object.keys(symbols).length} symbol frames`);
+                    return { ok: Object.keys(symbols).length > 0, count: Object.keys(symbols).length };
+                } catch (error) {
+                    console.error('CHEAT_TOOL: exportSymbolAssets failed', error);
+                    return { ok: false, count: 0, reason: String(error) };
+                }
+            }
+
+            spriteFrameToDataURL(spriteFrame) {
+                if (!spriteFrame) return null;
+                try {
+                    const { texture, rect, rotated } = this._resolveSpriteFrameSource(spriteFrame);
+                    if (!texture || !rect) return null;
+
+                    const source = this._getTextureDrawSource(texture);
+                    if (!source) return null;
+
+                    const width = Math.max(1, Math.floor(rect.width || 64));
+                    const height = Math.max(1, Math.floor(rect.height || 64));
+                    const sx = Math.max(0, Math.floor(rect.x || 0));
+                    const sy = Math.max(0, Math.floor(rect.y || 0));
+
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) return null;
+
+                    if (source instanceof HTMLImageElement
+                        || source instanceof HTMLCanvasElement
+                        || (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap)) {
+                        if (rotated) {
+                            canvas.width = height;
+                            canvas.height = width;
+                            ctx.translate(0, width);
+                            ctx.rotate(-Math.PI / 2);
+                            ctx.drawImage(source, sx, sy, height, width, 0, 0, height, width);
+                        } else {
+                            canvas.width = width;
+                            canvas.height = height;
+                            ctx.drawImage(source, sx, sy, width, height, 0, 0, width, height);
+                        }
+                        return canvas.toDataURL('image/png');
+                    }
+
+                    if (source instanceof Uint8Array || source instanceof Uint8ClampedArray) {
+                        const texWidth = texture.width || texture._width || width;
+                        const texHeight = texture.height || texture._height || height;
+                        const tmp = document.createElement('canvas');
+                        tmp.width = texWidth;
+                        tmp.height = texHeight;
+                        const tmpCtx = tmp.getContext('2d');
+                        const imageData = tmpCtx.createImageData(texWidth, texHeight);
+                        imageData.data.set(source.subarray(0, texWidth * texHeight * 4));
+                        tmpCtx.putImageData(imageData, 0, 0);
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(tmp, sx, sy, width, height, 0, 0, width, height);
+                        return canvas.toDataURL('image/png');
+                    }
+
+                    return null;
+                } catch (error) {
+                    console.warn('CHEAT_TOOL: spriteFrameToDataURL failed', error);
+                    return null;
+                }
+            }
+
+            // Dynamic-atlas frames keep the drawable Texture2D on `_original`.
+            _resolveSpriteFrameSource(spriteFrame) {
+                const frameRect = spriteFrame.rect || spriteFrame._rect || null;
+                const rotated = !!(spriteFrame.rotated || spriteFrame._rotated || spriteFrame.isRotated);
+                const original = spriteFrame.original || spriteFrame._original;
+
+                if (original?._texture) {
+                    const width = frameRect?.width
+                        || spriteFrame._originalSize?.width
+                        || original._texture.width
+                        || 64;
+                    const height = frameRect?.height
+                        || spriteFrame._originalSize?.height
+                        || original._texture.height
+                        || 64;
+                    return {
+                        texture: original._texture,
+                        rect: {
+                            x: original._x ?? 0,
+                            y: original._y ?? 0,
+                            width,
+                            height,
+                        },
+                        rotated,
+                    };
+                }
+
+                const texture = spriteFrame.texture || spriteFrame._texture;
+                return {
+                    texture,
+                    rect: frameRect || {
+                        x: 0,
+                        y: 0,
+                        width: spriteFrame.width || texture?.width || 64,
+                        height: spriteFrame.height || texture?.height || 64,
+                    },
+                    rotated,
+                };
+            }
+
+            _getTextureDrawSource(texture) {
+                if (!texture) return null;
+                const imageAsset = texture.image || texture._image;
+                let source = imageAsset?.data || imageAsset?._nativeAsset || imageAsset?._data || imageAsset;
+                if (!source) {
+                    source = texture._nativeAsset || texture._canvas || texture._image;
+                }
+                return source || null;
+            }
+
             getCheatConfig() {
                 const userId = this.isBaseV2 ? this.gameState.networkBridge.getUserId() : this.gameState._playerInfoStateManager.getUserId();
                 const gameId = this.isBaseV2 ? this.director.gameConfig.GAME_ID : this.director.node.config.GAME_ID;
@@ -339,3 +512,4 @@
         }
     }
 })();
+//# sourceURL=EvalCheatScript.js

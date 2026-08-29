@@ -34,6 +34,55 @@
     color: inherit;
 }
 
+.matrix-preview-title {
+    margin-bottom: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.matrix-preview-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.matrix-preview-row {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.matrix-preview-cell {
+    width: 48px;
+    min-height: 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-soft);
+    padding: 0.2rem;
+}
+
+.matrix-preview-cell img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+.matrix-preview-cell span {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    line-height: 1;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .card-header {
     cursor: pointer;
     gap: 0.4rem;
