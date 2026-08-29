@@ -1,0 +1,102 @@
+body {
+    background-color: #1d1f2a;
+    background-size: cover;
+    background-attachment: fixed;
+    background-position: center;
+    background-repeat: no-repeat;
+    height: 100%;
+    width: 100%;
+}
+
+.txt-message {
+    font-size: 2em;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.status-indicator-running {
+    background-color: green;
+}
+
+.status-indicator-paused {
+    background-color: orange;
+}
+
+.status-indicator-stopped {
+    background-color: red;
+}
+
+.log-container {
+    height: 200px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.log-info {
+    color: green;
+}
+
+.log-warning {
+    color: orange;
+}
+
+.log-error {
+    color: red;
+}
+
+.header {
+    background-color: black;
+    width: 100%;
+    position: fixed;
+    z-index: 10;
+}
+
+.content {
+    padding-top: 100px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 20px;
+}
+
+.content-m-table {
+    height: calc(100vh - 70px);
+    overflow-y: auto;
+}
+
+.page {
+    display: none;
+    width: 100%;
+}
+
+.visible {
+    display: block;
+}
+
+.hidden {
+    display: none;
+}
+
+.table {
+    width: 100%;
+}
+
+.footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: black;
+    padding: 10px;
+}

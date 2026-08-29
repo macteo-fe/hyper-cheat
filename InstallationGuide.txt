@@ -1,0 +1,6 @@
+# Tool Cheat Slot
+## Installation Guide
+- Open chrome://extensions/ on Google Chrome.
+- Enable developer mode and click on load unpacked extension.
+- Open the tool folder.
+- Note: When updating version, overwrite new files into the old folder and reload to avoid losing saved files.

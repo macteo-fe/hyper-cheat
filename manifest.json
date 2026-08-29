@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Tool-Cheat-Slot",
+  "version": "3.3",
+  "description": "Form SaiGon1975 With Love",
+  "devtools_page": "src/devtools/DevToolsPanel.html",
+  "icons": {
+    "48": "src/asset/images/icon.png"
+  },
+  "permissions": [
+    "webNavigation",
+    "scripting",
+    "storage",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content-scripts/ContentCheatScript.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  }
+}
