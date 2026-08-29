@@ -5,7 +5,7 @@ const database = new Database();
 database.onload = () => {
     const tabId = chrome.devtools?.inspectedWindow?.tabId;
     if (!tabId) {
-        console.error('Tool-Cheat-Slot: no inspected tab found');
+        console.error('hyber-cheat: no inspected tab found');
         return;
     }
     const toolCheat = new App({ tabId, database });

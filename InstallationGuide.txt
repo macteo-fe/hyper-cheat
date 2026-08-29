@@ -1,4 +1,4 @@
-# Tool Cheat Slot
+# hyber-cheat
 ## Installation Guide
 - Open chrome://extensions/ on Google Chrome.
 - Enable developer mode and click on load unpacked extension.

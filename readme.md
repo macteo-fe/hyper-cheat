@@ -1,4 +1,4 @@
-# Tool Cheat Slot
+# hyber-cheat
 
 ## 🚀 Setup 
 1. Navigate to [chrome://extensions/](chrome://extensions/)
