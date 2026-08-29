@@ -11,6 +11,7 @@ export class TableController {
     }
     start() {
         document.getElementById('m_btn_add').addEventListener('click', this.handleAddCheatBtnClick);
+        document.getElementById('m_inp_cheat').addEventListener('keydown', this.handleCheatInputKeyDown);
         document.getElementById('m_btn_clear').addEventListener('click', this.handleClearSessionClick);
         document.getElementById('m_btn_reload').addEventListener('click', this.handleReloadGameClick);
         document.getElementById('m_tbl_cheat').addEventListener('click', this.handleDataTableBodyClick);
@@ -23,6 +24,11 @@ export class TableController {
     handleAddCheatBtnClick = () => {
         const cheatTitle = this._replaceSpaces(document.getElementById('m_inp_cheat').value);
         this.addNewData(cheatTitle);
+    }
+    handleCheatInputKeyDown = (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        this.handleAddCheatBtnClick();
     }
 
     handleClearSessionClick = () => {

@@ -440,8 +440,19 @@ a:hover {
     font-weight: 700;
 }
 
-.status-step {
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.status-row .env-switch {
     margin-left: auto;
+}
+
+.status-row .status-step {
+    margin-left: 0;
     color: var(--text-muted);
     font-family: var(--mono);
     font-size: 0.85rem;

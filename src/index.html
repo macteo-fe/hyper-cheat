@@ -22,9 +22,15 @@
                     <img class="brand-logo" src="./asset/images/icon.png" alt="">
                     <h2 id="m_txt_title">hyber-cheat</h2>
                 </div>
-                <div class="env-switch form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="m_chk_env" checked>
-                    <label class="form-check-label" for="m_chk_env">Staging</label>
+                <div class="header-actions">
+                    <div class="env-switch form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="m_chk_loop">
+                        <label class="form-check-label" for="m_chk_loop">Loop</label>
+                    </div>
+                    <div class="env-switch form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="m_chk_env" checked>
+                        <label class="form-check-label" for="m_chk_env">Staging</label>
+                    </div>
                 </div>
             </div>
 
@@ -104,6 +110,10 @@
                             <span id="e_txt_status" class="status-value">Stopped</span>
                             <span id="e_ico_status" class="status-indicator status-indicator-stopped"></span>
                             <span id="e_txt_step" class="status-step">Step: 0</span>
+                            <div class="env-switch form-check form-switch ms-auto">
+                                <input class="form-check-input" type="checkbox" id="e_chk_loop">
+                                <label class="form-check-label" for="e_chk_loop">Loop</label>
+                            </div>
                         </div>
                     </div>
 

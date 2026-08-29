@@ -19,6 +19,7 @@ export class CheatController {
         this.cheatSteps = null;
         this._count = 0;
         this._isCheating = false;
+        this._isLoop = false;
     }
 
     initializeDOMElements() {
@@ -33,6 +34,8 @@ export class CheatController {
         this.resumeButton = document.getElementById('e_btn_resume');
         this.clearSession = document.getElementById('e_btn_clear');
         this.reloadButton = document.getElementById('e_btn_reload');
+        this.mainLoopCheckbox = document.getElementById('m_chk_loop');
+        this.execLoopCheckbox = document.getElementById('e_chk_loop');
     }
 
     addEventListeners() {
@@ -44,6 +47,8 @@ export class CheatController {
         this.clearLogButton.addEventListener('click', this.handleClearLog);
         this.clearSession.addEventListener('click', this.handleClearSessionClick);
         this.reloadButton.addEventListener('click', this.handleReloadGameClick);
+        this.mainLoopCheckbox.addEventListener('change', this.handleLoopToggle);
+        this.execLoopCheckbox.addEventListener('change', this.handleLoopToggle);
         if (chrome && chrome.runtime) chrome.runtime.onMessage.addListener(this.handleMessage);
     }
 
@@ -52,9 +57,14 @@ export class CheatController {
     }
     set count(value) {
         if (this.cheatSteps && this.cheatSteps.length && value >= this.cheatSteps.length) {
-            this.addLog(`No Cheat Steps`, 'warn');
-            this.stopCheat();
-            value = 0;
+            if (this.isLoop) {
+                this.addLog(`Loop restart`, 'info');
+                value = 0;
+            } else {
+                this.addLog(`No Cheat Steps`, 'warn');
+                this.stopCheat();
+                value = 0;
+            }
         }
         document.getElementById('e_txt_step').innerHTML = `Step: ${value}`;
         this._count = value;
@@ -67,11 +77,26 @@ export class CheatController {
         chrome.devtools.inspectedWindow.eval(cmd, () => { });
         this._isCheating = value;
     }
+    get isLoop() {
+        return this._isLoop;
+    }
+    set isLoop(value) {
+        this._isLoop = !!value;
+        if (this.mainLoopCheckbox) this.mainLoopCheckbox.checked = this._isLoop;
+        if (this.execLoopCheckbox) this.execLoopCheckbox.checked = this._isLoop;
+    }
 
     //handle Event
     handleBackButton = () => {
         this.resetCheatState();
         this.showPage('m_view_container');
+    }
+
+    handleLoopToggle = (event) => {
+        this.isLoop = event.target.checked;
+        if (this.cheatSteps) {
+            this.addLog(this.isLoop ? 'Loop enabled' : 'Loop disabled', 'info');
+        }
     }
 
     handlePlayCheat = () => {
@@ -145,6 +170,7 @@ export class CheatController {
             if (this.cheatSteps.length) {
                 this.addLog(`Loaded cheat ${cheatName}`, 'success');
                 this.showPage('e_view_container');
+                this.startCheat();
             } else {
                 this.addLog(`No cheat steps`, 'error');
             }
@@ -318,7 +344,7 @@ export class CheatController {
         this.stopButton.disabled = false;
         this.pauseButton.disabled = false;
         this.resumeButton.disabled = true;
-        this.addLog(`Start Cheat`, "success");
+        this.addLog(this.isLoop ? 'Start Cheat (Loop)' : 'Start Cheat', "success");
     }
 
     stopCheat() {
