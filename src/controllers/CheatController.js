@@ -20,6 +20,7 @@ export class CheatController {
         this._count = 0;
         this._isCheating = false;
         this._isLoop = false;
+        this.isPaused = false;
     }
 
     initializeDOMElements() {
@@ -36,6 +37,7 @@ export class CheatController {
         this.reloadButton = document.getElementById('e_btn_reload');
         this.mainLoopCheckbox = document.getElementById('m_chk_loop');
         this.execLoopCheckbox = document.getElementById('e_chk_loop');
+        this.envCheckbox = document.getElementById('m_chk_env');
     }
 
     addEventListeners() {
@@ -49,6 +51,7 @@ export class CheatController {
         this.reloadButton.addEventListener('click', this.handleReloadGameClick);
         this.mainLoopCheckbox.addEventListener('change', this.handleLoopToggle);
         this.execLoopCheckbox.addEventListener('change', this.handleLoopToggle);
+        this.envCheckbox.addEventListener('change', this.handleEnvToggle);
         if (chrome && chrome.runtime) chrome.runtime.onMessage.addListener(this.handleMessage);
     }
 
@@ -56,26 +59,14 @@ export class CheatController {
         return this._count;
     }
     set count(value) {
-        if (this.cheatSteps && this.cheatSteps.length && value >= this.cheatSteps.length) {
-            if (this.isLoop) {
-                this.addLog(`Loop restart`, 'info');
-                value = 0;
-            } else {
-                this.addLog(`No Cheat Steps`, 'warn');
-                this.stopCheat();
-                value = 0;
-            }
-        }
-        document.getElementById('e_txt_step').innerHTML = `Step: ${value}`;
         this._count = value;
+        document.getElementById('e_txt_step').innerHTML = `Step: ${value}`;
     }
     get isCheating() {
         return this._isCheating;
     }
     set isCheating(value) {
-        const cmd = `cheatScript.isCheating = ${value}`;
-        chrome.devtools.inspectedWindow.eval(cmd, () => { });
-        this._isCheating = value;
+        this._isCheating = !!value;
     }
     get isLoop() {
         return this._isLoop;
@@ -86,7 +77,39 @@ export class CheatController {
         if (this.execLoopCheckbox) this.execLoopCheckbox.checked = this._isLoop;
     }
 
-    //handle Event
+    getEnvironment() {
+        return this.envCheckbox?.checked ? 'staging' : 'dev';
+    }
+
+    syncRuntime(extra = {}) {
+        const runtime = {
+            isCheating: this.isCheating,
+            isPaused: this.isPaused,
+            isLoop: this.isLoop,
+            stepIndex: this.count,
+            gameId: this.gameId,
+            userId: this.userId,
+            environment: this.getEnvironment(),
+            cheatSteps: this.cheatSteps || [],
+            ...extra,
+        };
+        const cmd = `window.cheatScript && window.cheatScript.setRuntime(${JSON.stringify(runtime)})`;
+        return this.evalCommand(cmd).catch(() => false);
+    }
+
+    evalCommand(cmd) {
+        return new Promise((resolve, reject) => {
+            if (!chrome?.devtools?.inspectedWindow) {
+                reject(new Error('No inspected window'));
+                return;
+            }
+            chrome.devtools.inspectedWindow.eval(cmd, (result, isException) => {
+                if (isException) reject(isException);
+                else resolve(result);
+            });
+        });
+    }
+
     handleBackButton = () => {
         this.resetCheatState();
         this.showPage('m_view_container');
@@ -94,9 +117,14 @@ export class CheatController {
 
     handleLoopToggle = (event) => {
         this.isLoop = event.target.checked;
+        this.syncRuntime({ isLoop: this.isLoop });
         if (this.cheatSteps) {
             this.addLog(this.isLoop ? 'Loop enabled' : 'Loop disabled', 'info');
         }
+    }
+
+    handleEnvToggle = () => {
+        this.syncRuntime({ environment: this.getEnvironment() });
     }
 
     handlePlayCheat = () => {
@@ -122,6 +150,7 @@ export class CheatController {
     handleClearLog = () => {
         this.clearLog();
     }
+
     handleClearSessionClick = () => {
         const stagingUrl = `https://cheat.staging.enostd.gay/${this.gameId}/clearsession`;
         const devUrl = `https://cheat.dev.enostd.gay/${this.gameId}/clearsession`;
@@ -131,7 +160,7 @@ export class CheatController {
         const request = new XMLHttpRequest();
         request.open('POST', url, true);
         request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-        request.onreadystatechange = function () {
+        request.onreadystatechange = () => {
             if (request.readyState == 4) {
                 if (chrome && chrome.windows && chrome.tabs) {
                     chrome.tabs.reload(this.tabId);
@@ -141,12 +170,13 @@ export class CheatController {
         };
         request.send(dataPost);
     }
+
     handleReloadGameClick = () => {
         if (chrome && chrome.windows && chrome.tabs) {
             chrome.tabs.reload(this.tabId);
-
         }
     }
+
     showCheat({ key, cheatName, gameId, userId, currency }) {
         this.key = Number(key);
         this.cheatName = cheatName;
@@ -157,6 +187,7 @@ export class CheatController {
         this.cheatSteps = [];
         this.count = 0;
         this.isCheating = false;
+        this.isPaused = false;
         this.playButton.disabled = true;
         this.stopButton.disabled = true;
         this.pauseButton.disabled = true;
@@ -170,7 +201,9 @@ export class CheatController {
             if (this.cheatSteps.length) {
                 this.addLog(`Loaded cheat ${cheatName}`, 'success');
                 this.showPage('e_view_container');
-                this.startCheat();
+                this.startCheat().then((ok) => {
+                    if (!ok) this.addLog('Failed to sync cheat runtime into game page', 'error');
+                });
             } else {
                 this.addLog(`No cheat steps`, 'error');
             }
@@ -178,96 +211,40 @@ export class CheatController {
     }
 
     handleMessage = (message, sender) => {
-        if (message.action === "onSendCheatToNetwork" && this.tabId == sender.tab.id) {
-            this.addLog(`Spin Click`);
-            this.cheat(() => {
-                this.callRunORGFunction(message);
-            });
+        if (sender?.tab?.id !== this.tabId) return;
+        if (message.action === 'onCheatProgress') {
+            this.handleCheatProgress(message.data || {});
         }
     }
 
-    callRunORGFunction(message) {
-        let data = message.data;
-        data.isCheated = true;
-        const params = JSON.stringify(message.data);
-        const cmd = `cheatScript.gameState._clientSendRequest(${params})`;
-        chrome.devtools.inspectedWindow.eval(cmd, (result, isException) => {
-            if (isException) {
-                console.error(`Error call _clientSendRequest`, isException);
-            } else {
-                console.log(`Successfully call _clientSendRequest`, result);
-            }
-        });
-    }
-
-    cheat(callbackSendSpin) {
-        const stagingUrl = `https://cheat.staging.enostd.gay/${this.gameId}/inputed`;
-        const devUrl = `https://cheat.dev.enostd.gay/${this.gameId}/inputed`;
-        const isStagingMode = document.getElementById('m_chk_env').checked;
-        const apiUrl = isStagingMode ? stagingUrl : devUrl;
-        this.callbackPost = () => {
-            callbackSendSpin && callbackSendSpin();
-            this.callbackPost = null;
-        };
-        if (this.isCheating && !this.isPaused) {
-            const data = this.cheatSteps[this.count];
-            if (!data) {
-                this.addLog(`No Step ${this.count}`, 'danger');
-                this.stopCheat();
-                return this.callbackPost && this.callbackPost();
-            }
-            data.userId = this.userId;
-            delete data.index;
-            this._post({
-                url: apiUrl, data,
-                callback: (response) => {
-                    if (this.callbackPost) {
-                        this.addLog(`Cheat Success ${JSON.stringify(data)}`, 'success');
-                        this.count++;
-                        this.callbackPost();
-                    }
-                },
-                callbackErr: () => {
-                    if (this.callbackPost) {
-                        this.addLog(`Error cheat ${JSON.stringify(data)}`, 'error');
-                        this.stopCheat();
-                        this.callbackPost();
-                    }
-                }
-            });
-        } else {
-            callbackSendSpin && callbackSendSpin();
+    handleCheatProgress(detail) {
+        const { type, stepIndex, data, message, event } = detail;
+        switch (type) {
+            case 'intercept':
+                this.addLog(`Spin Click${event ? ` (${event})` : ''}`);
+                break;
+            case 'success':
+                this.addLog(`Cheat Success ${JSON.stringify(data)}`, 'success');
+                break;
+            case 'step':
+                this.count = stepIndex ?? this.count;
+                break;
+            case 'loop':
+                this.addLog('Loop restart', 'info');
+                this.count = stepIndex ?? 0;
+                break;
+            case 'error':
+                this.addLog(`Error cheat ${message || JSON.stringify(data)}`, 'error');
+                this.stopCheat({ syncOnly: false, skipLog: true });
+                this.addLog('Game request blocked until cheat succeeds', 'warning');
+                break;
+            case 'finished':
+                this.addLog(message || 'Cheat finished', 'warn');
+                this.stopCheat({ skipLog: true });
+                break;
+            default:
+                break;
         }
-    }
-
-
-    _post({ url = '', data = {}, callback = (data) => { }, apiUrl = '', callbackErr = () => { } }) {
-        const dataPost = this._encodeQueryData(data);
-        const fullURL = apiUrl + url;
-        const request = new XMLHttpRequest();
-        request.open('POST', fullURL, true);
-        request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-        request.onreadystatechange = function () {
-            if (request.readyState == 4) {
-                if (request.status === 200) {
-                    callback({
-                        status: request.status,
-                        data: request.responseText
-                    });
-                } else {
-                    callbackErr();
-                }
-            } else if (request.readyState === 0) {
-                callbackErr();
-            }
-        };
-        request.ontimeout = function (e) {
-            callbackErr();
-        };
-        request.onerror = (e) => {
-            callbackErr();
-        };
-        request.send(dataPost);
     }
 
     _encodeQueryData(data) {
@@ -295,13 +272,13 @@ export class CheatController {
     addLog(message, type = '') {
         const time = new Date().toLocaleTimeString();
         let logClass = '';
-        if (type === 'warning') {
+        if (type === 'warning' || type === 'warn') {
             logClass = 'log-warning';
         }
         if (type === 'error') {
             logClass = 'log-error';
         }
-        if (type === 'success') {
+        if (type === 'success' || type === 'info') {
             logClass = 'log-info';
         }
         this.logBox.innerHTML += `<div class="${logClass}">[${time}] ${message}</div>`;
@@ -319,7 +296,12 @@ export class CheatController {
         this.count = 0;
         this.isCheating = false;
         this.isPaused = false;
-        this.stopCheat();
+        this.syncRuntime({
+            isCheating: false,
+            isPaused: false,
+            stepIndex: 0,
+            cheatSteps: [],
+        });
         this.clearLog();
     }
 
@@ -345,9 +327,16 @@ export class CheatController {
         this.pauseButton.disabled = false;
         this.resumeButton.disabled = true;
         this.addLog(this.isLoop ? 'Start Cheat (Loop)' : 'Start Cheat', "success");
+        return this.syncRuntime({
+            isCheating: true,
+            isPaused: false,
+            stepIndex: 0,
+            cheatSteps: this.cheatSteps || [],
+        });
     }
 
-    stopCheat() {
+    stopCheat(options = {}) {
+        const { skipLog = false } = options;
         this.isCheating = false;
         this.isPaused = false;
         this.count = 0;
@@ -356,7 +345,12 @@ export class CheatController {
         this.stopButton.disabled = true;
         this.pauseButton.disabled = true;
         this.resumeButton.disabled = true;
-        this.addLog(`Stop cheat`, 'warning');
+        if (!skipLog) this.addLog(`Stop cheat`, 'warning');
+        return this.syncRuntime({
+            isCheating: false,
+            isPaused: false,
+            stepIndex: 0,
+        });
     }
 
     pauseCheat() {
@@ -365,6 +359,7 @@ export class CheatController {
         this.pauseButton.disabled = true;
         this.resumeButton.disabled = false;
         this.addLog('Pause button clicked.', 'warning');
+        return this.syncRuntime({ isPaused: true });
     }
 
     resumeCheat() {
@@ -373,5 +368,6 @@ export class CheatController {
         this.pauseButton.disabled = false;
         this.resumeButton.disabled = true;
         this.addLog('Resume button clicked.', 'info');
+        return this.syncRuntime({ isPaused: false });
     }
 }

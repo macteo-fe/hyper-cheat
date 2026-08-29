@@ -20,17 +20,16 @@
                 this.gameState = gameStateBase || gameStateBaseV2;
                 this.isBaseV2 = !!gameStateBaseV2;
                 this.isOverwritten = false;
-                if (this.gameState) {
-                    this.overWriteFunction();
-                    this.initCheatSpeed();
-                }
-            }
-            overWriteFunction() {
-                if (this.isOverwritten || this.director.isOverWriteCheat) {
-                    console.log("CHEAT_TOOL: Function already overwritten, skipping...");
-                    return false;
-                }
-                const functions = [
+                this.isCheating = false;
+                this.isPaused = false;
+                this.isLoop = false;
+                this.cheatSteps = [];
+                this.stepIndex = 0;
+                this.gameId = null;
+                this.userId = null;
+                this.environment = 'staging';
+                this._spinChain = Promise.resolve();
+                this._SPIN_EVENTS = [
                     'client-normal-game-trial-request',
                     'client-normal-spin-request',
                     'client-free-spin-request',
@@ -42,22 +41,55 @@
                     'client-powerup-game-trial-request',
                     'client-powerup-spin-request',
                 ];
+                if (this.gameState) {
+                    this.overWriteFunction();
+                    this.initCheatSpeed();
+                }
+            }
+
+            setRuntime(config = {}) {
+                if (config.isCheating !== undefined) this.isCheating = !!config.isCheating;
+                if (config.isPaused !== undefined) this.isPaused = !!config.isPaused;
+                if (config.isLoop !== undefined) this.isLoop = !!config.isLoop;
+                if (config.stepIndex !== undefined) this.stepIndex = Number(config.stepIndex) || 0;
+                if (config.gameId !== undefined) this.gameId = config.gameId;
+                if (config.userId !== undefined) this.userId = config.userId;
+                if (config.environment !== undefined) this.environment = config.environment;
+                if (Array.isArray(config.cheatSteps)) {
+                    this.cheatSteps = config.cheatSteps.map((step) => ({ ...step }));
+                }
+                return true;
+            }
+
+            overWriteFunction() {
+                if (this.isOverwritten || this.director.isOverWriteCheat) {
+                    console.log("CHEAT_TOOL: Function already overwritten, skipping...");
+                    return false;
+                }
 
                 try {
                     if (!this.gameState.orgClientSendRequest) {
-                        this.gameState.orgClientSendRequest = this.gameState._clientSendRequest;
+                        this.gameState.orgClientSendRequest = this.gameState._clientSendRequest.bind(this.gameState);
                     }
 
                     this.gameState._clientSendRequest = (...params) => {
                         const data = params[params.length - 1];
-                        const { event, isCheated } = data;
+                        const { event, isCheated } = data || {};
+                        const shouldCheat = this.isCheating
+                            && !this.isPaused
+                            && !isCheated
+                            && this.director.isOverWriteCheat
+                            && this._SPIN_EVENTS.includes(event);
 
-                        if (functions.includes(event) && !isCheated && this.isCheating && this.director.isOverWriteCheat) {
-                            console.log(`CHEAT_TOOL: Intercepting cheat request for event: ${event}`);
-                            window.dispatchEvent(new CustomEvent('onSendCheatToNetwork', { detail: data }));
-                        } else {
+                        if (!shouldCheat) {
                             this.gameState.orgClientSendRequest(...params);
+                            return;
                         }
+
+                        this._emitProgress('intercept', { event, stepIndex: this.stepIndex });
+                        this._spinChain = this._spinChain
+                            .catch(() => { })
+                            .then(() => this._handleCheatedSpin(params));
                     };
 
                     this.director.isOverWriteCheat = true;
@@ -69,6 +101,110 @@
                     return false;
                 }
             }
+
+            async _handleCheatedSpin(params) {
+                const data = params[params.length - 1];
+                const step = this._getCurrentStepPayload();
+
+                if (!step) {
+                    this._emitProgress('finished', { stepIndex: this.stepIndex, message: 'No cheat steps' });
+                    this.isCheating = false;
+                    this.gameState.orgClientSendRequest(...params);
+                    return;
+                }
+
+                try {
+                    await this.sendCheat(step);
+                    data.isCheated = true;
+                    this._advanceStep(step);
+                    this.gameState.orgClientSendRequest(...params);
+                } catch (error) {
+                    this._emitProgress('error', {
+                        stepIndex: this.stepIndex,
+                        data: step,
+                        message: error?.message || 'Cheat request failed',
+                    });
+                    // Do not send the real game request when cheat fails.
+                }
+            }
+
+            _getCurrentStepPayload() {
+                if (!this.cheatSteps || !this.cheatSteps.length) return null;
+                if (this.stepIndex < 0 || this.stepIndex >= this.cheatSteps.length) return null;
+                const step = { ...this.cheatSteps[this.stepIndex] };
+                delete step.index;
+                if (this.userId) step.userId = this.userId;
+                return step;
+            }
+
+            _advanceStep(step) {
+                const completedIndex = this.stepIndex;
+                let nextIndex = completedIndex + 1;
+
+                this._emitProgress('success', { stepIndex: completedIndex, data: step });
+
+                if (nextIndex >= this.cheatSteps.length) {
+                    if (this.isLoop) {
+                        nextIndex = 0;
+                        this.stepIndex = nextIndex;
+                        this._emitProgress('loop', { stepIndex: nextIndex });
+                        this._emitProgress('step', { stepIndex: nextIndex });
+                        return;
+                    }
+                    this.isCheating = false;
+                    this.stepIndex = 0;
+                    this._emitProgress('finished', { stepIndex: 0, data: step });
+                    return;
+                }
+
+                this.stepIndex = nextIndex;
+                this._emitProgress('step', { stepIndex: nextIndex });
+            }
+
+            _getCheatUrl() {
+                const env = this.environment === 'dev' ? 'dev' : 'staging';
+                return `https://cheat.${env}.enostd.gay/${this.gameId}/inputed`;
+            }
+
+            _encodeQueryData(data) {
+                return Object.keys(data)
+                    .filter((key) => data[key] !== undefined && data[key] !== null)
+                    .map((key) => [key, data[key]].map(encodeURIComponent).join('='))
+                    .join('&');
+            }
+
+            sendCheat(data) {
+                return new Promise((resolve, reject) => {
+                    if (!this.gameId) {
+                        reject(new Error('Missing gameId'));
+                        return;
+                    }
+                    const request = new XMLHttpRequest();
+                    request.open('POST', this._getCheatUrl(), true);
+                    request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+                    request.onreadystatechange = () => {
+                        if (request.readyState !== 4) return;
+                        if (request.status === 200) {
+                            resolve({
+                                status: request.status,
+                                data: request.responseText,
+                            });
+                        } else {
+                            reject(new Error(`Cheat HTTP ${request.status}`));
+                        }
+                    };
+                    request.ontimeout = () => reject(new Error('Cheat request timeout'));
+                    request.onerror = () => reject(new Error('Cheat request network error'));
+                    request.send(this._encodeQueryData(data));
+                });
+            }
+
+            _emitProgress(type, detail = {}) {
+                window.dispatchEvent(new CustomEvent('onCheatProgress', {
+                    detail: { type, ...detail },
+                }));
+            }
+
             getCheatConfig() {
                 const userId = this.isBaseV2 ? this.gameState.networkBridge.getUserId() : this.gameState._playerInfoStateManager.getUserId();
                 const gameId = this.isBaseV2 ? this.director.gameConfig.GAME_ID : this.director.node.config.GAME_ID;
@@ -78,6 +214,7 @@
                 });
                 window.dispatchEvent(event);
             }
+
             initCheatSpeed() {
                 if (this.gameVersion == "3") {
                     const originalTick = this.cc.director.tick || this.cc.Director.prototype.tick;
@@ -89,6 +226,7 @@
                     this.scheduler = this.cc.director.getScheduler();
                 }
             }
+
             setCheatSpeed(mul) {
                 if (this.gameVersion == "3") {
                     this.multiplier = mul;
@@ -96,6 +234,7 @@
                     this.scheduler.setTimeScale(mul);
                 }
             }
+
             resetSpeed() {
                 if (this.gameVersion == 3) {
                     this.multiplier = 1.0;
