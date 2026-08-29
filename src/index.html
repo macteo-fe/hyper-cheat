@@ -4,71 +4,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hyber-cheat</title>
     <link rel="stylesheet" href="./styles/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="./styles/style.css">
+    <link rel="stylesheet" href="./styles/card.css">
+    <link rel="stylesheet" href="./styles/drag-drop.css">
 </head>
 
 <body>
-    <h1 id="m_txt_logMessage" class="text-white txt-message">Loading Game...</h1>
+    <h1 id="m_txt_logMessage" class="txt-message">Loading Game...</h1>
 
     <!-- Main Table Page -->
     <div id="m_view_container" class="page">
         <div class="header">
-            <div class="px-2 d-flex justify-content-start">
-                <h2 class="text-white" id="m_txt_title">hyber-cheat</h2>
-                <div class="form-check form-switch ms-auto">
+            <div class="header-top">
+                <div class="brand">
+                    <img class="brand-logo" src="./asset/images/icon.png" alt="">
+                    <h2 id="m_txt_title">hyber-cheat</h2>
+                </div>
+                <div class="env-switch form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="m_chk_env" checked>
-                    <label class="form-check-label text-white" for="m_chk_env">Staging</label>
+                    <label class="form-check-label" for="m_chk_env">Staging</label>
                 </div>
             </div>
 
-            <div class="px-2 mb-2 d-flex justify-content-start">
-                <div class="me-2">
-                    <input type="text" class="form-control" id="m_inp_cheat" placeholder="Cheat Title">
-                </div>
-                <div>
+            <div class="toolbar">
+                <div class="toolbar-group">
+                    <input type="text" class="form-control input-cheat" id="m_inp_cheat" placeholder="Cheat title…">
                     <button type="button" class="btn btn-primary" id="m_btn_add">Add</button>
                 </div>
-                <div class="ms-auto">
-                    <button type="button" class="btn btn-danger" id="m_btn_clear">Clear Session</button>
-                    <button type="button" class="btn btn-warning" id="m_btn_reload">Reload</button>
+                <div class="toolbar-group toolbar-group-end">
+                    <button type="button" class="btn btn-danger btn-ghost" id="m_btn_clear">Clear Session</button>
+                    <button type="button" class="btn btn-warning btn-ghost" id="m_btn_reload">Reload</button>
                 </div>
             </div>
         </div>
 
         <div class="content content-m-table" id="m_tbl_cheat">
-            <table class="table table-bordered table-light">
-                <thead>
-                    <tr>
-                        <th>Game ID</th>
-                        <th>Name</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="m_tbl_body"></tbody>
-            </table>
+            <div class="table-shell">
+                <table class="table table-modern">
+                    <thead>
+                        <tr>
+                            <th>Game ID</th>
+                            <th>Name</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="m_tbl_body"></tbody>
+                </table>
+            </div>
         </div>
 
         <div class="footer">
-            <button class="btn btn-success me-3" id="m_btn_speedUp">Speed X10</button>
-            <button class="btn btn-danger hidden" id="m_btn_stopSpeed">Stop Speed</button>
-            <button class="btn btn-secondary float-end" id="m_btn_exportAll">Export All</button>
+            <div class="footer-group">
+                <button class="btn btn-success" id="m_btn_speedUp">Speed ×10</button>
+                <button class="btn btn-danger hidden" id="m_btn_stopSpeed">Stop Speed</button>
+            </div>
+            <button class="btn btn-secondary btn-ghost" id="m_btn_exportAll">Export All</button>
         </div>
     </div>
 
     <!-- Setup Form Page -->
     <div id="s_view_container" class="page">
         <div class="header">
-            <div class="d-flex justify-content-between top-div pt-2 pb-2">
-                <h2 class="text-white" id="s_txt_title"></h2>
-                <div>
-                    <button class="btn btn-primary me-1" id="s_btn_add">Add Step</button>
-                    <button class="btn btn-success me-1" id="s_btn_run">►Run</button>
-                    <button class="btn btn-danger me-2" id="s_btn_back">Back</button>
+            <div class="header-top">
+                <h2 id="s_txt_title"></h2>
+                <div class="toolbar-group">
+                    <button class="btn btn-primary" id="s_btn_add">Add Step</button>
+                    <button class="btn btn-success" id="s_btn_run">► Run</button>
+                    <button class="btn btn-danger btn-ghost" id="s_btn_back">Back</button>
                 </div>
             </div>
         </div>
-        <div class=" content">
+        <div class="content content-setup">
             <div id="s_lst_steps" class="sortable-list"></div>
         </div>
     </div>
@@ -76,40 +84,40 @@
     <!-- Execution Page -->
     <div id="e_view_container" class="page">
         <div class="header">
-            <div class="d-flex justify-content-between top-div pt-2 pb-2">
-                <h2 class="text-white" id="e_txt_title"></h2>
-                <div>
-                    <button class="btn btn-danger me-2" id="e_btn_back">Back</button>
+            <div class="header-top">
+                <h2 id="e_txt_title"></h2>
+                <div class="toolbar-group">
+                    <button class="btn btn-danger btn-ghost" id="e_btn_back">Back</button>
                 </div>
             </div>
         </div>
 
-        <div class="content">
-            <div class="card">
-                <div class="card-header bg-dark text-white">
+        <div class="content content-exec">
+            <div class="panel">
+                <div class="panel-header">
                     <h5>Control Panel</h5>
                 </div>
-                <div class="card-body">
-                    <div class="status-panel mb-3">
-                        <p>
-                            Status:
-                            <span id="e_txt_status" class="fw-bold">Stopped</span>
+                <div class="panel-body">
+                    <div class="status-panel">
+                        <div class="status-row">
+                            <span class="status-label">Status</span>
+                            <span id="e_txt_status" class="status-value">Stopped</span>
                             <span id="e_ico_status" class="status-indicator status-indicator-stopped"></span>
-                            <span id="e_txt_step">Step: 0</span>
-                        </p>
+                            <span id="e_txt_step" class="status-step">Step: 0</span>
+                        </div>
                     </div>
 
-                    <div class="control-buttons d-flex mb-3">
-                        <button id="e_btn_play" class="btn btn-success me-2">Play</button>
-                        <button id="e_btn_stop" class="btn btn-danger me-2" disabled>Stop</button>
-                        <button id="e_btn_pause" class="btn btn-warning me-2" disabled>Pause</button>
+                    <div class="control-buttons">
+                        <button id="e_btn_play" class="btn btn-success">Play</button>
+                        <button id="e_btn_stop" class="btn btn-danger" disabled>Stop</button>
+                        <button id="e_btn_pause" class="btn btn-warning" disabled>Pause</button>
                         <button id="e_btn_resume" class="btn btn-primary" disabled>Resume</button>
                     </div>
 
-                    <div class="utility-buttons mb-3">
-                        <button id="e_btn_clearLog" class="btn btn-secondary">Clear Log</button>
-                        <button id="e_btn_clear" class="btn btn-danger">Clear Session</button>
-                        <button id="e_btn_reload" class="btn btn-warning">Reload</button>
+                    <div class="utility-buttons">
+                        <button id="e_btn_clearLog" class="btn btn-secondary btn-ghost">Clear Log</button>
+                        <button id="e_btn_clear" class="btn btn-danger btn-ghost">Clear Session</button>
+                        <button id="e_btn_reload" class="btn btn-warning btn-ghost">Reload</button>
                     </div>
 
                     <div class="log-section">

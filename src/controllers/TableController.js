@@ -147,17 +147,21 @@ export class TableController {
             const stringData = `data-gameId="${gameId}" data-cheatName="${cheatName}" data-key="${key}"`;
             return `
             <tr>
-                <td><a ${stringData}>${gameId}</a></td>
+                <td><span class="game-id-badge" ${stringData}>${gameId}</span></td>
                 <td>
-                    <a href="#" class="list-cheatName-link" ${stringData}>${cheatName}</a>
-                    <input type="text" class="form-control d-none"${stringData} value="${cheatName}"" />
-                    <button class="btn btn-sm btn-primary d-none" ${stringData}">Save</button>
-                    <button class="btn btn-sm btn-edit-cheatName" ${stringData} title="Edit Name">✎</button>
+                    <div class="name-cell">
+                        <a href="#" class="list-cheatName-link" ${stringData}>${cheatName}</a>
+                        <input type="text" class="form-control d-none" ${stringData} value="${cheatName}" />
+                        <button class="btn btn-sm btn-primary d-none" ${stringData}>Save</button>
+                        <button class="btn btn-sm btn-edit-cheatName" ${stringData} title="Edit Name">✎</button>
+                    </div>
                 </td>
                 <td>
-                    <button class="btn btn-success" ${stringData}>►Run</button>
-                    <button class="btn btn-danger" ${stringData}>Delete</button>
-                    <button class="btn btn-secondary" ${stringData}>Export</button>
+                    <div class="action-cell">
+                        <button class="btn btn-sm btn-success" ${stringData}>► Run</button>
+                        <button class="btn btn-sm btn-danger btn-ghost" ${stringData}>Delete</button>
+                        <button class="btn btn-sm btn-secondary btn-ghost" ${stringData}>Export</button>
+                    </div>
                 </td>
             </tr>
             `;

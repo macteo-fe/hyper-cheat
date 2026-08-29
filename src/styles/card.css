@@ -1,25 +1,102 @@
 .form-value-container {
-    margin-bottom: 8px;
+    margin-bottom: 0.5rem;
     display: flex;
     flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: var(--radius);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
 }
 
 .value-label {
-    font-weight: bold;
-    margin-left: 8px;
+    font-weight: 700;
+    margin-left: 0;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    word-break: break-word;
 }
 
 .matrix-container {
-    margin-top: 16px;
-    border: 1px solid #eee;
-    padding: 8px;
-    border-radius: 4px;
+    margin-top: 0.75rem;
+    border: 1px solid var(--border);
+    padding: 0.65rem;
+    border-radius: var(--radius);
+    background: #0d0f14;
+    color: #c8ced8;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    overflow-x: auto;
+}
+
+.matrix-container pre {
+    margin: 0;
+    color: inherit;
 }
 
 .card-header {
     cursor: pointer;
+    gap: 0.4rem;
+    align-items: center !important;
+    padding: 0.55rem 0.75rem !important;
 }
 
 .card-header:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-} 
+    background-color: var(--bg-hover) !important;
+}
+
+.card-header > a {
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.card-header > a:first-child {
+    min-width: 4.5rem;
+}
+
+.card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+    margin-left: auto;
+}
+
+.card-actions .btn-link {
+    min-width: 1.75rem;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.form-card .card-body {
+    padding: 0.85rem !important;
+}
+
+.form-card .card-body::after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+.form-card .leftDiv table,
+.form-card .rightDiv table {
+    color: var(--text);
+}
+
+.form-card .leftDiv td,
+.form-card .rightDiv td {
+    padding: 0.15rem;
+}
+
+.form-card input[type="submit"],
+.form-card button[type="submit"],
+.form-card input[type="button"] {
+    margin-top: 0.5rem;
+    border-radius: var(--radius);
+    border: none;
+    padding: 0.35rem 0.75rem;
+    font-weight: 600;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+}

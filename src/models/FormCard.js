@@ -6,7 +6,7 @@ export class FormCard {
         this.formText = '';
         this.isRender = false;
         this.elements = {
-            card: this._createDomElement('div', 'card mb-3'),
+            card: this._createDomElement('div', 'card mb-0 form-card'),
             header: {
                 container: this._createDomElement('div', 'card-header d-flex justify-content-between'),
                 stepLabel: this._createDomElement('a'),
@@ -229,7 +229,7 @@ export class FormCard {
         this.elements.body.rightDiv.formValues = {};
         const formCheat = document.createElement("div");
         formCheat.innerHTML = this.formText;
-        this.elements.body.rightDiv.container.style.backgroundColor = isUpdating ? '#e6f3ff' : '';
+        this.elements.body.rightDiv.container.classList.toggle('is-updating', isUpdating);
         Object.entries(this.data).forEach(([key, value]) => {
             if (!value) return;
 
@@ -245,10 +245,10 @@ export class FormCard {
             labelValue.textContent = value;
 
             if (key === 'matrixData') {
-                labelValue.style.color = this._checkMatrix(value, this.data.tableFormat) ? "green" : "red";
+                labelValue.style.color = this._checkMatrix(value, this.data.tableFormat) ? "var(--success)" : "var(--danger)";
                 this.elements.header.matrixLabel.textContent = value;
             } else {
-                labelValue.style.color = "green";
+                labelValue.style.color = "var(--success)";
             }
 
             valueContainer.appendChild(label);
