@@ -25,11 +25,6 @@ export class App {
         this.viewSteps = document.getElementById('s_view_container');
         this.viewExecution = document.getElementById('e_view_container');
         this.labelTitle = document.getElementById('m_txt_title');
-        this.btnCheatSpeed = document.getElementById('m_btn_speedUp');
-        this.btnCheatSpeed.addEventListener('click', this.handleCheatSpeedClick);
-        this.btnStopSpeed = document.getElementById('m_btn_stopSpeed');
-        this.btnStopSpeed.addEventListener('click', this.handleStopCheatSpeedClick);
-
 
         if (chrome && chrome.runtime) {
             chrome.runtime.onMessage.addListener(this.handleMessage);
@@ -172,18 +167,6 @@ export class App {
             }
         }
         throw this.logMessage('Failed to load cheat scenario!');
-    }
-    handleCheatSpeedClick = () => {
-        const cmd = `cheatScript.setCheatSpeed(10)`;
-        this.evalCommand(cmd);
-        this.btnCheatSpeed.style.display = 'none';
-        this.btnStopSpeed.style.display = 'inline-block';
-    }
-    handleStopCheatSpeedClick = () => {
-        const cmd = `cheatScript.resetSpeed()`;
-        this.evalCommand(cmd);
-        this.btnCheatSpeed.style.display = 'inline-block';
-        this.btnStopSpeed.style.display = 'none';
     }
     evalCommand(cmd) {
         return new Promise((resolve, reject) => {

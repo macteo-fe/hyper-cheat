@@ -199,11 +199,6 @@ a:hover {
     border-top: 1px solid var(--border);
 }
 
-.footer-group {
-    display: flex;
-    gap: 0.4rem;
-}
-
 .form-control,
 .form-select {
     color: var(--text) !important;

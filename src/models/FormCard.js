@@ -5,13 +5,15 @@ export class FormCard {
         this.data = {};
         this.formText = '';
         this.isRender = false;
+        this.isCollapsed = true;
         this.symbolAssets = {};
         this.elements = {
-            card: this._createDomElement('div', 'card mb-0 form-card'),
+            card: this._createDomElement('div', 'card mb-0 form-card is-collapsed'),
             header: {
                 container: this._createDomElement('div', 'card-header d-flex justify-content-between'),
                 stepLabel: this._createDomElement('a'),
                 matrixLabel: this._createDomElement('a'),
+                toggleLabel: this._createDomElement('span', 'card-toggle'),
                 buttons: {
                     actionsContainer: this._createDomElement('div', 'card-actions'),
                     duplicate: this._createButton('⏎'),
@@ -20,8 +22,13 @@ export class FormCard {
                     delete: this._createButton('⌫')
                 }
             },
+            summary: {
+                container: this._createDomElement('div', 'card-summary'),
+                data: this._createDomElement('div', 'card-summary-data'),
+                matrix: this._createDomElement('div', 'card-summary-matrix'),
+            },
             body: {
-                container: this._createDomElement('div', 'card-body', 'display: block;'),
+                container: this._createDomElement('div', 'card-body', 'display: none;'),
                 leftDiv: {
                     container: this._createDomElement('div', 'leftDiv', 'width: 50%; float: left;'),
                     inputs: [],
@@ -45,15 +52,20 @@ export class FormCard {
     // Create card element
     appendElements() {
         this.elements.card.appendChild(this.elements.header.container);
+        this.elements.card.appendChild(this.elements.summary.container);
         this.elements.card.appendChild(this.elements.body.container);
         // Header
         this.elements.header.container.appendChild(this.elements.header.stepLabel);
+        this.elements.header.container.appendChild(this.elements.header.toggleLabel);
         this.elements.header.container.appendChild(this.elements.header.matrixLabel);
         this.elements.header.container.appendChild(this.elements.header.buttons.actionsContainer);
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.duplicate);
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.up);
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.down);
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.delete);
+        // Summary
+        this.elements.summary.container.appendChild(this.elements.summary.data);
+        this.elements.summary.container.appendChild(this.elements.summary.matrix);
         // Body
         this.elements.body.container.appendChild(this.elements.body.leftDiv.container);
         this.elements.body.container.appendChild(this.elements.body.rightDiv.container);
@@ -73,6 +85,10 @@ export class FormCard {
 
     setSymbolAssets(symbols = {}) {
         this.symbolAssets = symbols || {};
+        if (this.isRender) {
+            this.updateRightDiv();
+            this.updateSummary();
+        }
     }
 
     //handle action
@@ -97,7 +113,16 @@ export class FormCard {
     }
     _handleHeaderClick(event) {
         if (event.target.tagName === 'BUTTON') return;
-        this.elements.body.container.style.display = this.elements.body.container.style.display === "none" ? 'block' : 'none';
+        this.setCollapsed(!this.isCollapsed);
+    }
+    setCollapsed(collapsed) {
+        this.isCollapsed = !!collapsed;
+        this.elements.card.classList.toggle('is-collapsed', this.isCollapsed);
+        this.elements.card.classList.toggle('is-expanded', !this.isCollapsed);
+        this.elements.body.container.style.display = this.isCollapsed ? 'none' : 'block';
+        this.elements.summary.container.style.display = this.isCollapsed ? 'block' : 'none';
+        this.elements.header.toggleLabel.textContent = this.isCollapsed ? '▸' : '▾';
+        if (this.isCollapsed) this.updateSummary();
     }
     _dispatchCardEvent(eventName, data = {}) {
         if (!this.isRender) return;
@@ -124,11 +149,14 @@ export class FormCard {
         this.updateHeader();
         this.updateLeftDiv();
         this.updateRightDiv();
+        this.updateSummary();
+        this.setCollapsed(this.isCollapsed);
     }
 
     updateHeader() {
         this.elements.header.stepLabel.textContent = `Step ${this.index}`;
-        this.elements.header.matrixLabel.textContent = ``;
+        this.elements.header.matrixLabel.textContent = '';
+        this.elements.header.toggleLabel.textContent = this.isCollapsed ? '▸' : '▾';
     }
 
     updateLeftDiv() {
@@ -141,6 +169,8 @@ export class FormCard {
             if (element) element.value = value;
         });
         this._setupInputHandlers(this.elements.body.leftDiv.container);
+        this._removeSubmitButtons(this.elements.body.leftDiv.container);
+        this._bindAutoSubmit(this.elements.body.leftDiv.container);
     }
     _setupInputHandlers(leftDiv) {
         const tableE = Array.from(leftDiv.getElementsByTagName("table"));
@@ -167,47 +197,51 @@ export class FormCard {
 
         const inputs = Array.from(leftDiv.getElementsByTagName("input"));
         const selects = Array.from(leftDiv.getElementsByTagName("select"));
-        const buttons = Array.from(leftDiv.getElementsByTagName("button"));
-        const submitInput = inputs.find(ip => ip.type === "submit");
-        const submitBtn = buttons.find(ip => ip.type === "submit");
-        const submitButton = submitInput || submitBtn;
-
         this.elements.body.leftDiv.inputs = inputs;
         this.elements.body.leftDiv.selects = selects;
-
-        const inputMatrix = inputs.find(ip => ip.id === "matrixData");
-        if (inputMatrix) {
-            inputMatrix.addEventListener('keyup', () => {
-                this._handleSubmit(inputs.concat(selects), false);
-            });
-        }
-
-        const allSubmitButtons = [...inputs, ...buttons].filter(ip => ip.type === "submit");
-        if (allSubmitButtons.length > 1) {
-            allSubmitButtons.forEach(btn => {
-                btn.type = "button";
-                btn.value = "Submit";
-                btn.onclick = () => {
-                    this._handleSubmit(inputs.concat(selects), true);
-                };
-            });
-        } else {
-            this.elements.body.leftDiv.submitButton = submitButton;
-            if (submitButton) {
-                submitButton.type = "button";
-                submitButton.value = "Submit";
-                submitButton.onclick = () => {
-                    this._handleSubmit(inputs.concat(selects), true);
-                }
-            }
-        }
+        this.elements.body.leftDiv.submitButton = null;
     }
-    _handleSubmit(inputs, isSentEvent = false) {
+
+    _removeSubmitButtons(container) {
+        if (!container) return;
+        container.querySelectorAll('input[type="submit"], button[type="submit"], #submitBtn').forEach((el) => {
+            el.style.display = 'none';
+            el.disabled = true;
+            el.onclick = null;
+        });
+    }
+
+    _getFormFields(container) {
+        if (!container) return [];
+        return [
+            ...container.querySelectorAll('input:not([type="submit"]):not([type="button"])'),
+            ...container.querySelectorAll('select'),
+            ...container.querySelectorAll('textarea'),
+        ];
+    }
+
+    _bindAutoSubmit(container) {
+        if (!container || container.dataset.autoSubmitBound === '1') return;
+        container.dataset.autoSubmitBound = '1';
+        const schedule = () => {
+            clearTimeout(this._autoSubmitTimer);
+            this._autoSubmitTimer = setTimeout(() => {
+                if (!this.isRender) return;
+                this._handleSubmit(this._getFormFields(container), true);
+            }, 200);
+        };
+        container.addEventListener('input', schedule);
+        container.addEventListener('change', schedule);
+    }
+
+    _handleSubmit(inputs, isSentEvent = true) {
         const newData = this._collectData(inputs);
+        newData.index = this.index;
         this.data = newData;
         this.updateRightDiv(true);
         if (isSentEvent) this._dispatchCardEvent('submit', { data: this.data, index: this.index });
     }
+
     _collectData(inputs) {
         const data = {};
         inputs.forEach((input) => {
@@ -221,13 +255,119 @@ export class FormCard {
         return data;
     }
 
-
     updateRightDiv(isUpdating = false) {
         const fragment = document.createDocumentFragment();
         this._renderFormValues(fragment, isUpdating);
         this._renderMatrixTable(fragment);
         this.elements.body.rightDiv.container.innerHTML = '';
         this.elements.body.rightDiv.container.appendChild(fragment);
+        this.updateSummary();
+    }
+
+    updateSummary() {
+        if (!this.elements.summary?.container) return;
+        this.elements.summary.data.innerHTML = this._buildSummaryDataHtml();
+        const { matrixData, tableFormat } = this._getMatrixSource();
+        if (matrixData && tableFormat) {
+            const matrixHtml = this._buildMatrix(matrixData, tableFormat, { compact: true });
+            this.elements.summary.matrix.innerHTML = matrixHtml || '<div class="card-summary-empty">No matrix</div>';
+        } else {
+            this.elements.summary.matrix.innerHTML = '<div class="card-summary-empty">No matrix</div>';
+        }
+    }
+
+    _buildSummaryDataHtml() {
+        const skipKeys = new Set(['index', 'userId', 'matrixData', 'tableFormat', 'megaSymbolCode']);
+        const formCheat = document.createElement('div');
+        formCheat.innerHTML = this.formText || '';
+        const entries = Object.entries(this.data || {}).filter(([key, value]) => {
+            if (skipKeys.has(key)) return false;
+            if (value === undefined || value === null || value === '') return false;
+            return true;
+        });
+
+        if (!entries.length && !this.data?.matrixData) {
+            return '<div class="card-summary-empty">Empty step</div>';
+        }
+
+        const chips = entries.slice(0, 6).map(([key, value]) => {
+            const el = formCheat.querySelector(`#${key}`) || formCheat.querySelector(`[name="${key}"]`);
+            const label = el?.parentNode?.innerText?.trim()?.split('\n')[0] || key;
+            const shortValue = this._shortenValue(value);
+            return `<span class="card-summary-chip" title="${key}: ${String(value).replace(/"/g, '&quot;')}"><b>${this._escapeHtml(label)}</b> ${this._escapeHtml(shortValue)}</span>`;
+        });
+
+        if (this.data?.matrixData) {
+            const format = this.data.tableFormat || this.data.megaSymbolCode || '';
+            chips.unshift(`<span class="card-summary-chip"><b>matrix</b> ${this._escapeHtml(this._shortenValue(this.data.matrixData))}${format ? ` · ${this._escapeHtml(String(format))}` : ''}</span>`);
+        }
+
+        return `<div class="card-summary-chips">${chips.join('')}</div>`;
+    }
+
+    _shortenValue(value, max = 28) {
+        const text = String(value);
+        if (text.length <= max) return text;
+        return `${text.slice(0, max - 1)}…`;
+    }
+
+    _escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    _getMatrixSource() {
+        const left = this.elements.body?.leftDiv?.container;
+        const liveMatrix = left?.querySelector?.('#matrixData, textarea[name="matrixData"], input[name="matrixData"]')?.value;
+        const liveFormat = left?.querySelector?.('#tableFormat, input[name="tableFormat"], textarea[name="tableFormat"]')?.value;
+        const liveMega = left?.querySelector?.('#megaSymbolCode, input[name="megaSymbolCode"]')?.value;
+
+        let matrixData = (liveMatrix ?? this.data?.matrixData ?? '').toString().trim();
+        let tableFormat = (liveFormat ?? this.data?.tableFormat ?? '').toString().trim();
+
+        if (this.gameId === '9833') {
+            tableFormat = (liveMega ?? this.data?.megaSymbolCode ?? tableFormat ?? '').toString().trim();
+        }
+
+        if (!tableFormat) {
+            tableFormat = this._getDefaultTableFormatFromFormText() || '';
+        }
+
+        if (!matrixData) matrixData = null;
+        if (!tableFormat) tableFormat = null;
+
+        return { matrixData, tableFormat };
+    }
+
+    _getDefaultTableFormatFromFormText() {
+        if (!this.formText) return null;
+        try {
+            const wrap = document.createElement('div');
+            wrap.innerHTML = this.formText;
+            const input = wrap.querySelector('#tableFormat, [name="tableFormat"]');
+            const value = input?.getAttribute('value') || input?.textContent || '';
+            return value.toString().trim() || null;
+        } catch {
+            return null;
+        }
+    }
+
+    _parseTableFormat(format) {
+        return String(format)
+            .split(',')
+            .map((n) => parseInt(String(n).trim(), 10))
+            .filter((n) => Number.isFinite(n) && n > 0);
+    }
+
+    _getCellIndex(row, colIndex, formatValues) {
+        let cellIndex = 0;
+        for (let i = 0; i < colIndex; i++) {
+            cellIndex += formatValues[i];
+        }
+        return cellIndex + row;
     }
 
     _renderFormValues(container, isUpdating = false) {
@@ -251,7 +391,6 @@ export class FormCard {
 
             if (key === 'matrixData') {
                 labelValue.style.color = this._checkMatrix(value, this.data.tableFormat) ? "var(--success)" : "var(--danger)";
-                this.elements.header.matrixLabel.textContent = value;
             } else {
                 labelValue.style.color = "var(--success)";
             }
@@ -269,14 +408,10 @@ export class FormCard {
     }
 
     _renderMatrixTable(container) {
-        let { matrixData = null, tableFormat = null, megaSymbolCode = null } = this.data || {};
-        if (this.gameId === '9833') {
-            tableFormat = megaSymbolCode;
-        }
-
+        const { matrixData, tableFormat } = this._getMatrixSource();
         if (!matrixData || !tableFormat) return;
         try {
-            const matrixHtml = this._buildMatrix(matrixData, tableFormat);
+            const matrixHtml = this._buildMatrix(matrixData, tableFormat, { compact: false });
             if (matrixHtml) {
                 const matrixContainer = document.createElement("div");
                 matrixContainer.className = 'matrix-container';
@@ -295,10 +430,8 @@ export class FormCard {
 
         try {
             const matrixValues = matrixData.trim().split(',').filter(val => val.length > 0);
-            const formatValues = format.split(',').map(num => parseInt(num, 10));
-
-            if (formatValues.some(isNaN)) return false;
-
+            const formatValues = this._parseTableFormat(format);
+            if (!formatValues.length) return false;
             const expectedTotal = formatValues.reduce((sum, val) => sum + val, 0);
             return matrixValues.length === expectedTotal;
         } catch (error) {
@@ -316,36 +449,45 @@ export class FormCard {
         return this.symbolAssets[base] || null;
     }
 
-    _buildMatrix(matrixData, format) {
+    _buildMatrix(matrixData, format, options = {}) {
         if (!matrixData || !format) return '';
+        const { compact = false } = options;
         try {
-            const matrixValues = matrixData.split(',');
-            const formatValues = format.split(',').map(Number);
-            const matrix = [];
-            let currentIndex = 0;
+            const matrixValues = String(matrixData).split(',').map((v) => v.trim());
+            const formatValues = this._parseTableFormat(format);
+            if (!formatValues.length) return '';
+
             const maxRows = Math.max(...formatValues);
+            const numCols = formatValues.length;
+            const formatLabel = formatValues.join(',');
 
-            for (const rowLength of formatValues) {
-                const col = [];
-                for (let row = 0; row < rowLength; row++) {
-                    const value = matrixValues[currentIndex++];
-                    col.push(value ? value.split('-')[0] : null);
-                }
-                matrix.push(col);
-            }
-
-            let output = '<div class="matrix-preview-title">Matrix Preview</div>';
-            output += '<div class="matrix-preview-grid">';
+            let output = `<div class="matrix-preview-title">Matrix (${formatLabel})</div>`;
+            output += `<div class="matrix-preview-grid${compact ? ' is-compact' : ''}">`;
             for (let row = 0; row < maxRows; row++) {
                 output += '<div class="matrix-preview-row">';
-                for (let col = 0; col < matrix.length; col++) {
-                    const value = matrix[col][row] || '';
+                for (let colIndex = 0; colIndex < numCols; colIndex++) {
+                    const colLength = formatValues[colIndex];
+                    if (row >= colLength) {
+                        output += '<div class="matrix-preview-cell is-empty-cell"></div>';
+                        continue;
+                    }
+
+                    const cellIndex = this._getCellIndex(row, colIndex, formatValues);
+                    const rawValue = matrixValues[cellIndex] || '';
+                    const value = rawValue ? rawValue.split('-')[0] : '';
                     const image = this._resolveSymbolImage(value);
-                    output += '<div class="matrix-preview-cell">';
+
+                    output += `<div class="matrix-preview-cell${value ? '' : ' is-empty-cell'}" title="${value || ''}">`;
                     if (image) {
                         output += `<img src="${image}" alt="${value}" />`;
+                    } else if (value) {
+                        output += `<span class="matrix-preview-fallback">${value}</span>`;
+                    } else {
+                        output += `<span class="matrix-preview-fallback">·</span>`;
                     }
-                    output += `<span>${value || '·'}</span>`;
+                    if (!compact && value) {
+                        output += `<span class="matrix-preview-code">${value}</span>`;
+                    }
                     output += '</div>';
                 }
                 output += '</div>';
@@ -482,28 +624,17 @@ export class FormCard {
     initGame9808(container) {
         const matrixDataInput = container.querySelector("#matrixData"),
             tableFormatInput = container.querySelector("#tableFormat"),
-            tableMatrixContainer = container.querySelector("#tableMatrix"),
-            submitButton = container.querySelector("#submitBtn");
+            tableMatrixContainer = container.querySelector("#tableMatrix");
 
         matrixDataInput.addEventListener("input", updateMatrixTable.bind(this));
         tableFormatInput.addEventListener("input", updateMatrixTable.bind(this));
 
         const inputsMain = Array.from(container.getElementsByTagName("input"));
         const selects = Array.from(container.getElementsByTagName("select"));
-        const textArea = Array.from(container.getElementsByTagName("textarea"));
-
 
         this.elements.body.leftDiv.inputs = inputsMain;
         this.elements.body.leftDiv.selects = selects;
-
-        this.elements.body.leftDiv.submitButton = submitButton;
-        if (submitButton) {
-            submitButton.type = "button";
-            submitButton.value = "Submit";
-            submitButton.onclick = () => {
-                this._handleSubmit(inputsMain.concat(selects).concat(textArea), true);
-            }
-        }
+        this.elements.body.leftDiv.submitButton = null;
 
         function updateMatrixTable() {
             const matrixData = matrixDataInput.value.split(",").map((e) => e.trim());
@@ -529,10 +660,9 @@ export class FormCard {
             // Add event listeners to the input elements
             const inputs = tableMatrixContainer.querySelectorAll('input');
             inputs.forEach(input => {
-                input.addEventListener('change', (event) => {
+                input.addEventListener('input', (event) => {
                     const cellIndex = event.target.getAttribute('data-cell-index');
                     updateMatrixData(event.target, cellIndex);
-                    this._handleSubmit(inputsMain.concat(selects).concat(textArea), false);
                 });
             });
         }
@@ -558,30 +688,17 @@ export class FormCard {
     initGame9790(container) {
         let matrixDataInput = container.querySelector("#matrixData"),
             tableFormatInput = container.querySelector("#tableFormat"),
-            tableMatrixContainer = container.querySelector("#tableMatrix"),
-            submitButton = container.querySelector("#submitBtn");
+            tableMatrixContainer = container.querySelector("#tableMatrix");
 
         matrixDataInput.addEventListener("input", updateMatrixTable.bind(this));
         tableFormatInput.addEventListener("input", updateMatrixTable.bind(this));
 
         const inputsMain = Array.from(container.getElementsByTagName("input"));
         const selects = Array.from(container.getElementsByTagName("select"));
-        const textArea = Array.from(container.getElementsByTagName("textarea"));
-
 
         this.elements.body.leftDiv.inputs = inputsMain;
         this.elements.body.leftDiv.selects = selects;
-        const submitInput = inputsMain.find(ip => ip.type === "submit");
-
-        this.elements.body.leftDiv.submitButton = submitButton || submitInput;
-        submitButton = submitButton || submitInput;
-        if (submitButton) {
-            submitButton.type = "button";
-            submitButton.value = "Submit";
-            submitButton.onclick = () => {
-                this._handleSubmit(inputsMain.concat(selects).concat(textArea), true);
-            }
-        }
+        this.elements.body.leftDiv.submitButton = null;
 
         function updateMatrixTable() {
             const matrixData = matrixDataInput.value.split(",").map((e) => e.trim());
@@ -607,10 +724,9 @@ export class FormCard {
             // Add event listeners to the input elements
             const inputs = tableMatrixContainer.querySelectorAll('input');
             inputs.forEach(input => {
-                input.addEventListener('change', (event) => {
+                input.addEventListener('input', (event) => {
                     const cellIndex = event.target.getAttribute('data-cell-index');
                     updateMatrixData(event.target, cellIndex);
-                    this._handleSubmit(inputsMain.concat(selects).concat(textArea), false);
                 });
             });
         }
@@ -644,24 +760,10 @@ export class FormCard {
 
         const inputsMain = Array.from(container.getElementsByTagName("input"));
         const selects = Array.from(container.getElementsByTagName("select"));
-        const textArea = Array.from(container.getElementsByTagName("textarea"));
-
-        const submitInput = inputsMain.find(ip => ip.type === "submit");
-        const submitBtn = inputsMain.find(ip => ip.type === "submit");
-        const submitButton = submitInput || submitBtn;
-
 
         this.elements.body.leftDiv.inputs = inputsMain;
         this.elements.body.leftDiv.selects = selects;
-
-        this.elements.body.leftDiv.submitButton = submitButton;
-        if (submitButton) {
-            submitButton.type = "button";
-            submitButton.value = "Submit";
-            submitButton.onclick = () => {
-                this._handleSubmit(inputsMain.concat(selects).concat(textArea), true);
-            }
-        }
+        this.elements.body.leftDiv.submitButton = null;
 
         function updateMatrixTable() {
             const matrixData = matrixDataInput.value.split(",").map((e) => e.trim());
@@ -687,10 +789,9 @@ export class FormCard {
             // Add event listeners to the input elements
             const inputs = tableMatrixContainer.querySelectorAll('input');
             inputs.forEach(input => {
-                input.addEventListener('change', (event) => {
+                input.addEventListener('input', (event) => {
                     const cellIndex = event.target.getAttribute('data-cell-index');
                     updateMatrixData(event.target, cellIndex);
-                    this._handleSubmit(inputsMain.concat(selects).concat(textArea), false);
                 });
             });
         }
@@ -718,27 +819,16 @@ export class FormCard {
         const matrixDataInput = container.querySelector("#matrixData");
         const tableFormatInput = container.querySelector("#tableFormat");
         const tableMatrixContainer = container.querySelector("#tableMatrix");
-        const submitButton = container.querySelector('input[type="submit"]');
 
         matrixDataInput.addEventListener("input", updateMatrixTable.bind(this));
         tableFormatInput.addEventListener("input", updateMatrixTable.bind(this));
 
         const inputsMain = Array.from(container.getElementsByTagName("input"));
         const selects = Array.from(container.getElementsByTagName("select"));
-        const textArea = Array.from(container.getElementsByTagName("textarea"));
-
 
         this.elements.body.leftDiv.inputs = inputsMain;
         this.elements.body.leftDiv.selects = selects;
-
-        this.elements.body.leftDiv.submitButton = submitButton;
-        if (submitButton) {
-            submitButton.type = "button";
-            submitButton.value = "Submit";
-            submitButton.onclick = () => {
-                this._handleSubmit(inputsMain.concat(selects).concat(textArea), true);
-            }
-        }
+        this.elements.body.leftDiv.submitButton = null;
 
         function updateMatrixTable() {
             const matrixData = matrixDataInput.value.split(",").map((e) => e.trim());
@@ -764,10 +854,9 @@ export class FormCard {
             // Add event listeners to the input elements
             const inputs = tableMatrixContainer.querySelectorAll('input');
             inputs.forEach(input => {
-                input.addEventListener('change', (event) => {
+                input.addEventListener('input', (event) => {
                     const cellIndex = event.target.getAttribute('data-cell-index');
                     updateMatrixData(event.target, cellIndex);
-                    this._handleSubmit(inputsMain.concat(selects).concat(textArea), false);
                 });
             });
         }

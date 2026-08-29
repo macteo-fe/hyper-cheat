@@ -55,9 +55,6 @@ export class FormController {
         Array.from(this.stepsList.children).forEach((cardElement) => {
             if (cardElement.formCard) {
                 cardElement.formCard.setSymbolAssets(this.symbolAssets);
-                if (cardElement.formCard.data) {
-                    cardElement.formCard.updateRightDiv();
-                }
             }
         });
     }
@@ -168,8 +165,11 @@ export class FormController {
     }
     handleCardSubmit(event) {
         const { data, index } = event.detail;
+        if (!index || !this.cheatSteps[index - 1]) return;
         this.cheatSteps[index - 1] = data;
-        this.updateSteps();
+        this.cheatData.cheatSteps = this.cheatSteps;
+        // Persist only — avoid re-render so typing focus stays on the step form
+        this._db.updateData(this.cheatData);
     }
     duplicateStep(stepIndex, stepData) {
         const newStep = {
@@ -270,9 +270,11 @@ export class FormController {
         // Hide all card bodies before starting drag
         const allCards = this.stepsList.querySelectorAll('.form-card');
         allCards.forEach(cardElement => {
-            const cardBody = cardElement.querySelector('.card-body');
-            if (cardBody) {
-                cardBody.style.display = 'none';
+            if (cardElement.formCard?.setCollapsed) {
+                cardElement.formCard.setCollapsed(true);
+            } else {
+                const cardBody = cardElement.querySelector('.card-body');
+                if (cardBody) cardBody.style.display = 'none';
             }
         });
 

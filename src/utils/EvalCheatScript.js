@@ -43,7 +43,6 @@
                 ];
                 if (this.gameState) {
                     this.overWriteFunction();
-                    this.initCheatSpeed();
                 }
             }
 
@@ -386,34 +385,6 @@
                     detail: { userId, gameId, currency }
                 });
                 window.dispatchEvent(event);
-            }
-
-            initCheatSpeed() {
-                if (this.gameVersion == "3") {
-                    const originalTick = this.cc.director.tick || this.cc.Director.prototype.tick;
-                    this.multiplier = 1.0;
-                    this.cc.director.tick = (dt, ...args) => {
-                        originalTick.call(this.cc.director, dt * this.multiplier, ...args);
-                    };
-                } else {
-                    this.scheduler = this.cc.director.getScheduler();
-                }
-            }
-
-            setCheatSpeed(mul) {
-                if (this.gameVersion == "3") {
-                    this.multiplier = mul;
-                } else {
-                    this.scheduler.setTimeScale(mul);
-                }
-            }
-
-            resetSpeed() {
-                if (this.gameVersion == 3) {
-                    this.multiplier = 1.0;
-                } else {
-                    this.scheduler.setTimeScale(1.0);
-                }
             }
 
             checkOverwriteStatus() {
