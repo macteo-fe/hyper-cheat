@@ -261,8 +261,13 @@
                         },
                     }));
 
-                    console.log(`CHEAT_TOOL: exported ${Object.keys(symbols).length} symbol frames`);
-                    return { ok: Object.keys(symbols).length > 0, count: Object.keys(symbols).length };
+                    console.log(`CHEAT_TOOL: exported ${Object.keys(symbols).length}/${readyCodes.length} symbol frames`);
+                    return {
+                        ok: Object.keys(symbols).length > 0,
+                        count: Object.keys(symbols).length,
+                        total: readyCodes.length,
+                        missing: readyCodes.filter((code) => !symbols[code]),
+                    };
                 } catch (error) {
                     console.error('CHEAT_TOOL: exportSymbolAssets failed', error);
                     return { ok: false, count: 0, reason: String(error) };
@@ -272,109 +277,317 @@
             spriteFrameToDataURL(spriteFrame) {
                 if (!spriteFrame) return null;
                 try {
-                    const { texture, rect, rotated } = this._resolveSpriteFrameSource(spriteFrame);
-                    if (!texture || !rect) return null;
+                    const bitmapSource = this._resolveBitmapSource(spriteFrame);
+                    if (!bitmapSource) return null;
 
-                    const source = this._getTextureDrawSource(texture);
-                    if (!source) return null;
+                    const { bitmap, texture } = bitmapSource;
+                    let drawInfo = this._resolveSpriteFrameDraw(spriteFrame, texture);
+                    if (!drawInfo) return null;
 
-                    const width = Math.max(1, Math.floor(rect.width || 64));
-                    const height = Math.max(1, Math.floor(rect.height || 64));
-                    const sx = Math.max(0, Math.floor(rect.x || 0));
-                    const sy = Math.max(0, Math.floor(rect.y || 0));
+                    const { scaleX, scaleY } = this._getSourceScale(bitmap, texture);
+                    let { sx, sy, sw, sh, rotated } = drawInfo;
+                    let fsx = sx * scaleX;
+                    let fsy = sy * scaleY;
+                    let fsw = Math.max(1, sw * scaleX);
+                    let fsh = Math.max(1, sh * scaleY);
+
+                    if (!this._isCropValid(bitmap, fsx, fsy, fsw, fsh)) {
+                        const fallback = this._resolveRectFallback(spriteFrame, texture);
+                        if (fallback) {
+                            ({ sx, sy, sw, sh, rotated } = fallback);
+                            fsx = sx * scaleX;
+                            fsy = sy * scaleY;
+                            fsw = Math.max(1, sw * scaleX);
+                            fsh = Math.max(1, sh * scaleY);
+                        }
+                    }
+
+                    if (!this._isCropValid(bitmap, fsx, fsy, fsw, fsh)) {
+                        fsx = 0;
+                        fsy = 0;
+                        fsw = Math.max(1, bitmap.naturalWidth || bitmap.width || 1);
+                        fsh = Math.max(1, bitmap.naturalHeight || bitmap.height || 1);
+                        rotated = false;
+                    }
 
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     if (!ctx) return null;
 
-                    if (source instanceof HTMLImageElement
-                        || source instanceof HTMLCanvasElement
-                        || (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap)) {
-                        if (rotated) {
-                            canvas.width = height;
-                            canvas.height = width;
-                            ctx.translate(0, width);
-                            ctx.rotate(-Math.PI / 2);
-                            ctx.drawImage(source, sx, sy, height, width, 0, 0, height, width);
-                        } else {
-                            canvas.width = width;
-                            canvas.height = height;
-                            ctx.drawImage(source, sx, sy, width, height, 0, 0, width, height);
-                        }
-                        return canvas.toDataURL('image/png');
+                    if (rotated) {
+                        canvas.width = Math.max(1, Math.round(fsh));
+                        canvas.height = Math.max(1, Math.round(fsw));
+                        ctx.translate(0, fsw);
+                        ctx.rotate(-Math.PI / 2);
+                        ctx.drawImage(bitmap, fsx, fsy, fsw, fsh, 0, 0, fsw, fsh);
+                    } else {
+                        canvas.width = Math.max(1, Math.round(fsw));
+                        canvas.height = Math.max(1, Math.round(fsh));
+                        ctx.drawImage(bitmap, fsx, fsy, fsw, fsh, 0, 0, fsw, fsh);
                     }
-
-                    if (source instanceof Uint8Array || source instanceof Uint8ClampedArray) {
-                        const texWidth = texture.width || texture._width || width;
-                        const texHeight = texture.height || texture._height || height;
-                        const tmp = document.createElement('canvas');
-                        tmp.width = texWidth;
-                        tmp.height = texHeight;
-                        const tmpCtx = tmp.getContext('2d');
-                        const imageData = tmpCtx.createImageData(texWidth, texHeight);
-                        imageData.data.set(source.subarray(0, texWidth * texHeight * 4));
-                        tmpCtx.putImageData(imageData, 0, 0);
-                        canvas.width = width;
-                        canvas.height = height;
-                        ctx.drawImage(tmp, sx, sy, width, height, 0, 0, width, height);
-                        return canvas.toDataURL('image/png');
-                    }
-
-                    return null;
+                    return canvas.toDataURL('image/png');
                 } catch (error) {
                     console.warn('CHEAT_TOOL: spriteFrameToDataURL failed', error);
                     return null;
                 }
             }
 
-            // Dynamic-atlas frames keep the drawable Texture2D on `_original`.
-            _resolveSpriteFrameSource(spriteFrame) {
-                const frameRect = spriteFrame.rect || spriteFrame._rect || null;
-                const rotated = !!(spriteFrame.rotated || spriteFrame._rotated || spriteFrame.isRotated);
+            _resolveBitmapSource(spriteFrame) {
                 const original = spriteFrame.original || spriteFrame._original;
+                const texture = original?._texture || spriteFrame.texture || spriteFrame._texture;
+                if (!texture) return null;
+                const bitmap = this._ensureBitmapSource(this._getTextureDrawSource(texture), texture);
+                if (!bitmap) return null;
+                return { bitmap, texture };
+            }
+
+            _resolveSpriteFrameDraw(spriteFrame, texture) {
+                if (!texture) return null;
+
+                const texW = texture.width || texture._width || 1;
+                const texH = texture.height || texture._height || 1;
+                const frameRect = spriteFrame.rect || spriteFrame._rect;
+                const original = spriteFrame.original || spriteFrame._original;
+                const standalone = this._isStandaloneSpriteFrame(spriteFrame, texture, frameRect);
 
                 if (original?._texture) {
-                    const width = frameRect?.width
-                        || spriteFrame._originalSize?.width
-                        || original._texture.width
-                        || 64;
-                    const height = frameRect?.height
-                        || spriteFrame._originalSize?.height
-                        || original._texture.height
-                        || 64;
+                    const width = Math.max(1, original._width ?? frameRect?.width ?? 64);
+                    const height = Math.max(1, original._height ?? frameRect?.height ?? 64);
                     return {
-                        texture: original._texture,
-                        rect: {
-                            x: original._x ?? 0,
-                            y: original._y ?? 0,
-                            width,
-                            height,
-                        },
-                        rotated,
+                        sx: original._x ?? 0,
+                        sy: original._y ?? 0,
+                        sw: width,
+                        sh: height,
+                        rotated: false,
                     };
                 }
 
-                const texture = spriteFrame.texture || spriteFrame._texture;
+                // Per-texture sprite frames: _rect is a top-left trim rect on the owned texture.
+                if (standalone) {
+                    return this._cropFromRect(frameRect, spriteFrame, texW, texH);
+                }
+
+                const uv = this._getSpriteFrameUv(spriteFrame);
+                if (uv) {
+                    return this._cropFromUv(uv, texW, texH, frameRect, null);
+                }
+
+                if (frameRect) {
+                    return this._cropFromRect(frameRect, spriteFrame, texW, texH);
+                }
+
+                return { sx: 0, sy: 0, sw: texW, sh: texH, rotated: false };
+            }
+
+            _resolveRectFallback(spriteFrame, texture) {
+                const frameRect = spriteFrame.rect || spriteFrame._rect;
+                if (!frameRect) return null;
+                const texW = texture.width || texture._width || 1;
+                const texH = texture.height || texture._height || 1;
+                return this._cropFromRect(frameRect, spriteFrame, texW, texH);
+            }
+
+            _isStandaloneSpriteFrame(spriteFrame, texture, frameRect) {
+                if (spriteFrame.original || spriteFrame._original) return false;
+
+                const atlasUuid = spriteFrame.atlasUuid || spriteFrame._atlasUuid;
+                if (atlasUuid) return false;
+
+                const texW = texture.width || texture._width || 0;
+                const texH = texture.height || texture._height || 0;
+                if (!texW || !texH) return true;
+
+                const originalSize = spriteFrame.originalSize || spriteFrame._originalSize;
+                const osW = originalSize?.width ?? 0;
+                const osH = originalSize?.height ?? 0;
+                if (osW > 0 && osH > 0 && Math.abs(texW - osW) <= 4 && Math.abs(texH - osH) <= 4) {
+                    return true;
+                }
+
+                if (!frameRect) return texW <= 1024 && texH <= 1024;
+
+                const fitsInTexture = frameRect.x >= 0 && frameRect.y >= 0
+                    && frameRect.x + frameRect.width <= texW + 2
+                    && frameRect.y + frameRect.height <= texH + 2;
+                const rectArea = Math.max(1, frameRect.width * frameRect.height);
+                const texArea = texW * texH;
+                const isLargeAtlas = texW > 512 && texH > 512 && rectArea < texArea * 0.25;
+
+                if (isLargeAtlas) return false;
+                if (fitsInTexture && texW <= 1024 && texH <= 1024) return true;
+
+                return false;
+            }
+
+            _cropFromRect(frameRect, spriteFrame, texW, texH) {
+                const rotated = !!(spriteFrame.rotated ?? spriteFrame._rotated
+                    ?? (typeof spriteFrame.isRotated === 'function' ? spriteFrame.isRotated() : false));
+
+                if (!frameRect) {
+                    return { sx: 0, sy: 0, sw: texW, sh: texH, rotated: false };
+                }
+
+                const sx = Math.max(0, frameRect.x || 0);
+                const sy = Math.max(0, frameRect.y || 0);
+                const width = Math.max(1, frameRect.width || texW);
+                const height = Math.max(1, frameRect.height || texH);
+
+                if (rotated) {
+                    return { sx, sy, sw: height, sh: width, rotated: true };
+                }
+                return { sx, sy, sw: width, sh: height, rotated: false };
+            }
+
+            _getSpriteFrameUv(spriteFrame) {
+                const uv = spriteFrame.uv || spriteFrame._uv || spriteFrame.unbiasUV;
+                if (!uv || uv.length < 8) return null;
+                return Array.from(uv).slice(0, 8);
+            }
+
+            _normalizeSpriteUv(uv, texW, texH) {
+                if (uv.some((val) => val > 1.5)) {
+                    return [
+                        uv[0] / texW, uv[1] / texH,
+                        uv[2] / texW, uv[3] / texH,
+                        uv[4] / texW, uv[5] / texH,
+                        uv[6] / texW, uv[7] / texH,
+                    ];
+                }
+                return uv;
+            }
+
+            _isUvRotated(uv) {
+                const EPS = 1e-4;
+                const shareU = Math.abs(uv[0] - uv[2]) < EPS
+                    && Math.abs(uv[4] - uv[6]) < EPS
+                    && Math.abs(uv[0] - uv[4]) > EPS;
+                const shareV = Math.abs(uv[1] - uv[3]) < EPS
+                    && Math.abs(uv[5] - uv[7]) < EPS
+                    && Math.abs(uv[1] - uv[5]) > EPS;
+                if (shareU && !shareV) return true;
+                if (shareV && !shareU) return false;
+                return false;
+            }
+
+            _resolveSyFromUv(vMin, vMax, texH, frameRect) {
+                const syTopDown = vMin * texH;
+                const syBottomUp = (1 - vMax) * texH;
+                if (!frameRect || frameRect.y === undefined) return syTopDown;
+                const rectY = frameRect.y || 0;
+                if (Math.abs(syBottomUp - rectY) < Math.abs(syTopDown - rectY)) {
+                    return syBottomUp;
+                }
+                return syTopDown;
+            }
+
+            _cropFromUv(uv, texW, texH, frameRect, forceRotated = null) {
+                const normalized = this._normalizeSpriteUv(uv, texW, texH);
+                const uCoords = [normalized[0], normalized[2], normalized[4], normalized[6]];
+                const vCoords = [normalized[1], normalized[3], normalized[5], normalized[7]];
+                const uMin = Math.min(...uCoords);
+                const uMax = Math.max(...uCoords);
+                const vMin = Math.min(...vCoords);
+                const vMax = Math.max(...vCoords);
+                const rotated = forceRotated !== null ? forceRotated : this._isUvRotated(normalized);
+
+                const sx = uMin * texW;
+                const sy = this._resolveSyFromUv(vMin, vMax, texH, frameRect);
+                const sw = Math.max(1, (uMax - uMin) * texW);
+                const sh = Math.max(1, (vMax - vMin) * texH);
+
+                return { sx, sy, sw, sh, rotated };
+            }
+
+            _isCropValid(bitmap, sx, sy, sw, sh) {
+                const maxW = bitmap.naturalWidth || bitmap.width || 0;
+                const maxH = bitmap.naturalHeight || bitmap.height || 0;
+                if (!maxW || !maxH) return false;
+                return sx >= -0.5 && sy >= -0.5 && sx + sw <= maxW + 1 && sy + sh <= maxH + 1;
+            }
+
+            _getSourceScale(source, texture) {
+                const texW = texture?.width || texture?._width || 1;
+                const texH = texture?.height || texture?._height || 1;
+                let srcW = texW;
+                let srcH = texH;
+                if (source instanceof HTMLImageElement) {
+                    srcW = source.naturalWidth || source.width || texW;
+                    srcH = source.naturalHeight || source.height || texH;
+                } else if (source instanceof HTMLCanvasElement
+                    || (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap)) {
+                    srcW = source.width || texW;
+                    srcH = source.height || texH;
+                }
                 return {
-                    texture,
-                    rect: frameRect || {
-                        x: 0,
-                        y: 0,
-                        width: spriteFrame.width || texture?.width || 64,
-                        height: spriteFrame.height || texture?.height || 64,
-                    },
-                    rotated,
+                    scaleX: srcW / texW,
+                    scaleY: srcH / texH,
                 };
+            }
+
+            _ensureBitmapSource(source, texture) {
+                if (!source) return null;
+                if (source instanceof HTMLImageElement
+                    || source instanceof HTMLCanvasElement
+                    || (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap)) {
+                    return source;
+                }
+                if (source instanceof Uint8Array || source instanceof Uint8ClampedArray) {
+                    const texW = texture?.width || texture?._width || 1;
+                    const texH = texture?.height || texture?._height || 1;
+                    const tmp = document.createElement('canvas');
+                    tmp.width = texW;
+                    tmp.height = texH;
+                    const tmpCtx = tmp.getContext('2d');
+                    if (!tmpCtx) return null;
+                    const imageData = tmpCtx.createImageData(texW, texH);
+                    imageData.data.set(source.subarray(0, texW * texH * 4));
+                    tmpCtx.putImageData(imageData, 0, 0);
+                    return tmp;
+                }
+                return null;
             }
 
             _getTextureDrawSource(texture) {
                 if (!texture) return null;
                 const imageAsset = texture.image || texture._image;
-                let source = imageAsset?.data || imageAsset?._nativeAsset || imageAsset?._data || imageAsset;
-                if (!source) {
-                    source = texture._nativeAsset || texture._canvas || texture._image;
+                const htmlCandidates = [
+                    imageAsset?.htmlElement,
+                    imageAsset?._htmlElementObj,
+                    texture._htmlElementObj,
+                    imageAsset?._nativeAsset,
+                    imageAsset?.data,
+                    texture._nativeAsset,
+                    texture._canvas,
+                    imageAsset,
+                ];
+                for (const candidate of htmlCandidates) {
+                    if (!candidate) continue;
+                    if (candidate instanceof HTMLImageElement) {
+                        if (!candidate.complete || candidate.naturalWidth === 0) continue;
+                        return candidate;
+                    }
+                    if (candidate instanceof HTMLCanvasElement) {
+                        return candidate;
+                    }
+                    if (typeof ImageBitmap !== 'undefined' && candidate instanceof ImageBitmap) {
+                        return candidate;
+                    }
                 }
-                return source || null;
+                // Retry without requiring image.complete — some textures report late.
+                for (const candidate of htmlCandidates) {
+                    if (candidate instanceof HTMLImageElement) return candidate;
+                }
+                const bufferCandidates = [
+                    imageAsset?.data,
+                    imageAsset?._data,
+                    texture._nativeAsset,
+                ];
+                for (const candidate of bufferCandidates) {
+                    if (candidate instanceof Uint8Array || candidate instanceof Uint8ClampedArray) {
+                        return candidate;
+                    }
+                }
+                return null;
             }
 
             getCheatConfig() {

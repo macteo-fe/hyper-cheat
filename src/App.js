@@ -102,7 +102,7 @@ export class App {
     handleSymbolAssets(data) {
         if (!data?.symbols) return;
         if (data.gameId && this.gameId && String(data.gameId) !== String(this.gameId)) return;
-        this.symbolAssets = data.symbols;
+        this.symbolAssets = { ...(this.symbolAssets || {}), ...data.symbols };
         this.formController.setSymbolAssets(this.symbolAssets);
     }
 
@@ -110,16 +110,14 @@ export class App {
         if (this._symbolExportTrying) return;
         this._symbolExportTrying = true;
         for (let attempt = 0; attempt < 40; attempt++) {
-            if (Object.keys(this.symbolAssets || {}).length) {
-                this._symbolExportTrying = false;
-                return;
-            }
             try {
                 const result = await this.evalCommand('window.cheatScript && window.cheatScript.exportSymbolAssets()');
                 if (result?.ok && result.count > 0) {
-                    // Full payload arrives via onSymbolAssets message.
-                    this._symbolExportTrying = false;
-                    return;
+                    const exported = Object.keys(this.symbolAssets || {}).length;
+                    if (result.total && exported >= result.total) {
+                        this._symbolExportTrying = false;
+                        return;
+                    }
                 }
             } catch (_) {
                 // retry while table/symbols are still loading
