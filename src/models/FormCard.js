@@ -63,9 +63,9 @@ export class FormCard {
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.up);
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.down);
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.delete);
-        // Summary
-        this.elements.summary.container.appendChild(this.elements.summary.data);
+        // Summary — matrix left, field chips right when collapsed
         this.elements.summary.container.appendChild(this.elements.summary.matrix);
+        this.elements.summary.container.appendChild(this.elements.summary.data);
         // Body
         this.elements.body.container.appendChild(this.elements.body.leftDiv.container);
         this.elements.body.container.appendChild(this.elements.body.rightDiv.container);
@@ -276,33 +276,35 @@ export class FormCard {
         }
     }
 
+    _getFormFieldDisplay(key, value, formCheat) {
+        const element = formCheat.querySelector(`#${key}`) || formCheat.querySelector(`[name="${key}"]`);
+        const label = element?.parentNode?.innerText?.trim() || key;
+        let valueColor = 'var(--success)';
+        if (key === 'matrixData') {
+            const format = this.data.tableFormat || this.data.megaSymbolCode;
+            valueColor = this._checkMatrix(value, format) ? 'var(--success)' : 'var(--danger)';
+        }
+        return { label, valueColor };
+    }
+
     _buildSummaryDataHtml() {
-        const skipKeys = new Set(['index', 'userId', 'matrixData', 'tableFormat', 'megaSymbolCode']);
         const formCheat = document.createElement('div');
         formCheat.innerHTML = this.formText || '';
-        const entries = Object.entries(this.data || {}).filter(([key, value]) => {
-            if (skipKeys.has(key)) return false;
-            if (value === undefined || value === null || value === '') return false;
-            return true;
-        });
+        const entries = Object.entries(this.data || {}).filter(([, value]) => value);
 
-        if (!entries.length && !this.data?.matrixData) {
+        if (!entries.length) {
             return '<div class="card-summary-empty">Empty step</div>';
         }
 
-        const chips = entries.slice(0, 6).map(([key, value]) => {
-            const el = formCheat.querySelector(`#${key}`) || formCheat.querySelector(`[name="${key}"]`);
-            const label = el?.parentNode?.innerText?.trim()?.split('\n')[0] || key;
-            const shortValue = this._shortenValue(value);
-            return `<span class="card-summary-chip" title="${key}: ${String(value).replace(/"/g, '&quot;')}"><b>${this._escapeHtml(label)}</b> ${this._escapeHtml(shortValue)}</span>`;
-        });
-
-        if (this.data?.matrixData) {
-            const format = this.data.tableFormat || this.data.megaSymbolCode || '';
-            chips.unshift(`<span class="card-summary-chip"><b>matrix</b> ${this._escapeHtml(this._shortenValue(this.data.matrixData))}${format ? ` · ${this._escapeHtml(String(format))}` : ''}</span>`);
-        }
-
-        return `<div class="card-summary-chips">${chips.join('')}</div>`;
+        return entries.map(([key, value]) => {
+            const { label, valueColor } = this._getFormFieldDisplay(key, value, formCheat);
+            return `
+                <div class="form-value-container is-compact">
+                    <label class="form-value-label">${this._escapeHtml(label)}</label>
+                    <label class="value-label" style="color:${valueColor}">${this._escapeHtml(String(value))}</label>
+                </div>
+            `;
+        }).join('');
     }
 
     _shortenValue(value, max = 28) {
@@ -378,30 +380,27 @@ export class FormCard {
         Object.entries(this.data).forEach(([key, value]) => {
             if (!value) return;
 
+            const { label, valueColor } = this._getFormFieldDisplay(key, value, formCheat);
+
             const valueContainer = document.createElement("div");
             valueContainer.className = 'form-value-container';
 
-            const label = document.createElement("label");
+            const labelEl = document.createElement("label");
+            labelEl.className = 'form-value-label';
+            labelEl.textContent = label;
+
             const labelValue = document.createElement("label");
             labelValue.className = 'value-label';
-
-            const element = formCheat.querySelector(`#${key}`) || formCheat.querySelector(`[name=${key}]`);
-            label.textContent = element?.parentNode?.innerText?.trim() || key;
             labelValue.textContent = value;
+            labelValue.style.color = valueColor;
 
-            if (key === 'matrixData') {
-                labelValue.style.color = this._checkMatrix(value, this.data.tableFormat) ? "var(--success)" : "var(--danger)";
-            } else {
-                labelValue.style.color = "var(--success)";
-            }
-
-            valueContainer.appendChild(label);
+            valueContainer.appendChild(labelEl);
             valueContainer.appendChild(labelValue);
             container.appendChild(valueContainer);
 
             this.elements.body.rightDiv.formValues[key] = {
                 container: valueContainer,
-                label: label,
+                label: labelEl,
                 value: labelValue
             };
         });

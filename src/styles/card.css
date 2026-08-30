@@ -9,6 +9,15 @@
     border: 1px solid var(--border);
 }
 
+.form-value-label {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
 .value-label {
     font-weight: 700;
     margin-left: 0;
@@ -110,7 +119,10 @@
 }
 
 .card-summary {
-    display: block;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.75rem;
     padding: 0.55rem 0.75rem 0.7rem;
     border-bottom: 1px solid var(--border);
     background: #0d0f14;
@@ -120,11 +132,43 @@
     display: none !important;
 }
 
+.card-summary-matrix {
+    grid-column: 1;
+    grid-row: 1;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.card-summary-data {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: 220px;
+}
+
+.card-summary-data .form-value-container.is-compact {
+    margin-bottom: 0.25rem;
+    padding: 0.2rem 0.35rem;
+    gap: 0.05rem;
+}
+
+.card-summary-data .form-value-container.is-compact .form-value-label {
+    font-size: 0.58rem;
+    line-height: 1.2;
+}
+
+.card-summary-data .form-value-container.is-compact .value-label {
+    font-size: 0.65rem;
+    line-height: 1.25;
+}
+
 .card-summary-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem;
-    margin-bottom: 0.55rem;
+    align-content: flex-start;
 }
 
 .card-summary-chip {
@@ -147,10 +191,6 @@
 .card-summary-chip b {
     color: var(--text-muted);
     font-weight: 600;
-}
-
-.card-summary-matrix {
-    overflow-x: auto;
 }
 
 .card-summary-matrix .matrix-preview-title {
