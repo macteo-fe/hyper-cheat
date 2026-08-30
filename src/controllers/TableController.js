@@ -67,7 +67,6 @@ export class TableController {
         }
         if (event.target.classList.contains('btn-edit-cheatName')) {
             event.preventDefault();
-            const cheatName = event.target.dataset.cheatname;
             const key = event.target.dataset.key;
             const input = event.target.parentElement.querySelector('input[type="text"]');
             const saveBtn = event.target.parentElement.querySelector('button.btn-primary');
@@ -78,18 +77,32 @@ export class TableController {
             editBtn.classList.add('d-none');
             titleLink.classList.add('d-none');
             input.focus();
-            saveBtn.addEventListener('click', () => {
+            input.select();
+
+            let committed = false;
+            const commitEdit = () => {
+                if (committed) return;
+                committed = true;
                 const newCheatName = input.value.trim();
-                if (newCheatName) {
-                    this._db.updateCheatName(Number(key), newCheatName).then(() => {
-                        input.classList.add('d-none');
-                        saveBtn.classList.add('d-none');
-                        editBtn.classList.remove('d-none');
-                        titleLink.classList.remove('d-none');
-                        titleLink.textContent = newCheatName;
-                        titleLink.dataset.cheatname = newCheatName;
-                    });
+                if (!newCheatName) {
+                    committed = false;
+                    return;
                 }
+                this._db.updateCheatName(Number(key), newCheatName).then(() => {
+                    input.classList.add('d-none');
+                    saveBtn.classList.add('d-none');
+                    editBtn.classList.remove('d-none');
+                    titleLink.classList.remove('d-none');
+                    titleLink.textContent = newCheatName;
+                    titleLink.dataset.cheatname = newCheatName;
+                });
+            };
+
+            saveBtn.addEventListener('click', commitEdit, { once: true });
+            input.addEventListener('keydown', (keydownEvent) => {
+                if (keydownEvent.key !== 'Enter') return;
+                keydownEvent.preventDefault();
+                commitEdit();
             }, { once: true });
         }
         if (event.target.classList.contains('btn-danger')) {
