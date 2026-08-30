@@ -16,7 +16,7 @@ export class FormCard {
                 toggleLabel: this._createDomElement('span', 'card-toggle'),
                 buttons: {
                     actionsContainer: this._createDomElement('div', 'card-actions'),
-                    duplicate: this._createButton('⏎'),
+                    duplicate: this._createButton('⧉', 'Duplicate step'),
                     up: this._createButton('↑'),
                     down: this._createButton('↓'),
                     delete: this._createButton('⌫')
@@ -76,9 +76,11 @@ export class FormCard {
         if (style) element.style = style;
         return element;
     }
-    _createButton(symbol) {
+    _createButton(symbol, title = '') {
         const button = this._createDomElement('button', 'btn btn-link');
+        button.type = 'button';
         button.textContent = symbol;
+        if (title) button.title = title;
         return button;
     }
 
@@ -99,16 +101,23 @@ export class FormCard {
         this.elements.header.buttons.delete.addEventListener('click', this._handleDelete.bind(this));
         this.elements.header.container.addEventListener('click', this._handleHeaderClick.bind(this));
     }
-    _handleDuplicate() {
-        this._dispatchCardEvent('duplicate', { data: this.data });
+    _handleDuplicate(event) {
+        event.stopPropagation();
+        const data = this._cloneStepData(this._syncDataFromForm());
+        this.updateRightDiv(true);
+        this.updateSummary();
+        this._dispatchCardEvent('duplicate', { data });
     }
-    _handleMoveUp() {
+    _handleMoveUp(event) {
+        event.stopPropagation();
         this._dispatchCardEvent('moveUp');
     }
-    _handleMoveDown() {
+    _handleMoveDown(event) {
+        event.stopPropagation();
         this._dispatchCardEvent('moveDown');
     }
-    _handleDelete() {
+    _handleDelete(event) {
+        event.stopPropagation();
         this._dispatchCardEvent('delete');
     }
     _handleHeaderClick(event) {
@@ -232,6 +241,27 @@ export class FormCard {
         };
         container.addEventListener('input', schedule);
         container.addEventListener('change', schedule);
+    }
+
+    _syncDataFromForm() {
+        if (!this.isRender) return this.data;
+        clearTimeout(this._autoSubmitTimer);
+        const container = this.elements.body.leftDiv.container;
+        if (!container) return this.data;
+        const inputs = this._getFormFields(container);
+        if (!inputs.length) return this.data;
+        const newData = this._collectData(inputs);
+        newData.index = this.index;
+        this.data = newData;
+        return this.data;
+    }
+
+    _cloneStepData(data) {
+        try {
+            return JSON.parse(JSON.stringify(data || {}));
+        } catch {
+            return { ...(data || {}) };
+        }
     }
 
     _handleSubmit(inputs, isSentEvent = true) {

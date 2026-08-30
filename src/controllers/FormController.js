@@ -149,7 +149,12 @@ export class FormController {
     }
     handleCardDuplicate(event) {
         const { index, data } = event.detail;
-        this.duplicateStep(index - 1, data);
+        const stepIndex = index - 1;
+        if (stepIndex < 0 || stepIndex >= this.cheatSteps.length) return;
+        if (data) {
+            this.cheatSteps[stepIndex] = { ...data, index };
+        }
+        this.duplicateStep(stepIndex, data || this.cheatSteps[stepIndex]);
     }
     handleCardMoveToTop(event) {
         const { index } = event.detail;
@@ -172,11 +177,14 @@ export class FormController {
         this._db.updateData(this.cheatData);
     }
     duplicateStep(stepIndex, stepData) {
-        const newStep = {
-            ...stepData,
-            index: this.cheatSteps.length + 1
-        };
-        this.cheatSteps.splice(stepIndex + 1, 0, newStep);
+        let cloned;
+        try {
+            cloned = JSON.parse(JSON.stringify(stepData || {}));
+        } catch {
+            cloned = { ...(stepData || {}) };
+        }
+        delete cloned.index;
+        this.cheatSteps.splice(stepIndex + 1, 0, cloned);
         this.updateSteps();
     }
     moveStepToTop(stepIndex) {
