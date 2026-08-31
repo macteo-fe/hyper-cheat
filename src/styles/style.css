@@ -635,3 +635,47 @@ a:hover {
     background: rgba(34, 197, 94, 0.12);
 }
 
+.app-toast-container {
+    position: fixed;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    pointer-events: none;
+}
+
+.app-toast {
+    min-width: 220px;
+    max-width: 320px;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg-panel);
+    color: var(--text);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.app-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.app-toast-success {
+    border-color: rgba(34, 197, 94, 0.45);
+    background: #122117;
+    color: #86efac;
+}
+
+.app-toast-error {
+    border-color: rgba(239, 68, 68, 0.45);
+    background: #211212;
+    color: #fca5a5;
+}
+

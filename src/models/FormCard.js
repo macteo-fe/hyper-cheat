@@ -7,6 +7,7 @@ export class FormCard {
         this.isRender = false;
         this.isCollapsed = true;
         this.symbolAssets = {};
+        this.isTemplateStep = false;
         this.elements = {
             card: this._createDomElement('div', 'card mb-0 form-card is-collapsed'),
             header: {
@@ -17,6 +18,7 @@ export class FormCard {
                 buttons: {
                     actionsContainer: this._createDomElement('div', 'card-actions'),
                     duplicate: this._createButton('⧉', 'Duplicate step'),
+                    template: this._createButton('★', 'Set as new step template'),
                     up: this._createButton('↑'),
                     down: this._createButton('↓'),
                     delete: this._createButton('⌫')
@@ -60,6 +62,7 @@ export class FormCard {
         this.elements.header.container.appendChild(this.elements.header.matrixLabel);
         this.elements.header.container.appendChild(this.elements.header.buttons.actionsContainer);
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.duplicate);
+        this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.template);
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.up);
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.down);
         this.elements.header.buttons.actionsContainer.appendChild(this.elements.header.buttons.delete);
@@ -93,9 +96,18 @@ export class FormCard {
         }
     }
 
+    setTemplateActive(active) {
+        this.isTemplateStep = !!active;
+        this.elements.header.buttons.template.classList.toggle('is-active', this.isTemplateStep);
+        this.elements.header.buttons.template.title = this.isTemplateStep
+            ? 'New step template (active)'
+            : 'Set as new step template';
+    }
+
     //handle action
     addEventListeners() {
         this.elements.header.buttons.duplicate.addEventListener('click', this._handleDuplicate.bind(this));
+        this.elements.header.buttons.template.addEventListener('click', this._handleSetTemplate.bind(this));
         this.elements.header.buttons.up.addEventListener('click', this._handleMoveUp.bind(this));
         this.elements.header.buttons.down.addEventListener('click', this._handleMoveDown.bind(this));
         this.elements.header.buttons.delete.addEventListener('click', this._handleDelete.bind(this));
@@ -107,6 +119,13 @@ export class FormCard {
         this.updateRightDiv(true);
         this.updateSummary();
         this._dispatchCardEvent('duplicate', { data });
+    }
+    _handleSetTemplate(event) {
+        event.stopPropagation();
+        const data = this._cloneStepData(this._syncDataFromForm());
+        this.updateRightDiv(true);
+        this.updateSummary();
+        this._dispatchCardEvent('setTemplate', { data });
     }
     _handleMoveUp(event) {
         event.stopPropagation();
@@ -147,7 +166,7 @@ export class FormCard {
 
     //render card
     renderCard(data) {
-        const { dataStep, formText } = data;
+        const { dataStep, formText, isTemplateStep = false } = data;
         this.index = dataStep.index;
         this.data = dataStep;
         this.formText = formText;
@@ -160,6 +179,7 @@ export class FormCard {
         this.updateRightDiv();
         this.updateSummary();
         this.setCollapsed(this.isCollapsed);
+        this.setTemplateActive(isTemplateStep);
     }
 
     updateHeader() {

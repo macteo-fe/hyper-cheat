@@ -1,4 +1,6 @@
 import { FormCard } from '../models/FormCard.js';
+import { StepTemplateStore } from '../utils/stepTemplate.js';
+import { showToast } from '../utils/toast.js';
 
 export class FormController {
     constructor(data) {
@@ -39,6 +41,7 @@ export class FormController {
         this.symbolList.addEventListener('click', this.handleSymbolPaletteClick);
 
         document.addEventListener('card:duplicate', this.handleCardDuplicate.bind(this));
+        document.addEventListener('card:setTemplate', this.handleCardSetTemplate.bind(this));
         document.addEventListener('card:moveUp', this.handleCardMoveToTop.bind(this));
         document.addEventListener('card:moveDown', this.handleCardMoveToBottom.bind(this));
         document.addEventListener('card:delete', this.handleCardDelete.bind(this));
@@ -141,10 +144,43 @@ export class FormController {
     }
     addNewStep() {
         if (!this.formText || !this.canAddData) return;
-        this.cheatSteps.push({ index: this.cheatSteps.length + 1 });
+        const templateData = this._cloneStepTemplate();
+        this.cheatSteps.push(templateData);
+        this.updateSteps();
+    }
+    _cloneStepTemplate() {
+        return StepTemplateStore.clone();
+    }
+    handleCardSetTemplate(event) {
+        const { index, data } = event.detail;
+        const stepIndex = index - 1;
+        if (stepIndex < 0 || stepIndex >= this.cheatSteps.length) return;
+        if (data) {
+            this.cheatSteps[stepIndex] = { ...data, index };
+        }
+        this.setStepTemplate(stepIndex, data || this.cheatSteps[stepIndex]);
+    }
+    setStepTemplate(stepIndex, stepData) {
+        let cloned;
+        try {
+            cloned = JSON.parse(JSON.stringify(stepData || {}));
+        } catch {
+            cloned = { ...(stepData || {}) };
+        }
+        delete cloned.index;
+        StepTemplateStore.save(cloned);
+        this.cheatSteps[stepIndex] = { ...stepData, index: stepIndex + 1 };
         this.cheatData.cheatSteps = this.cheatSteps;
         this._db.updateData(this.cheatData).then(() => {
-            this.renderTableSteps();
+            showToast('Step template created successfully');
+            this.refreshTemplateIndicators();
+        });
+    }
+    refreshTemplateIndicators() {
+        Array.from(this.stepsList.children).forEach((cardElement) => {
+            const card = cardElement.formCard;
+            if (!card) return;
+            card.setTemplateActive(StepTemplateStore.matches(card.data));
         });
     }
     handleCardDuplicate(event) {
@@ -219,6 +255,7 @@ export class FormController {
             this.cheatSteps = cheatSteps ? cheatSteps : [];
             this.canAddData = true;
             this.updateExistingSteps(this.cheatSteps);
+            this.refreshTemplateIndicators();
         });
     }
     updateExistingSteps(dataSteps) {
@@ -226,16 +263,17 @@ export class FormController {
 
         dataSteps.forEach((dataStep, index) => {
             const existingCard = existingCards[index];
+            const isTemplateStep = StepTemplateStore.matches(dataStep);
             if (existingCard) {
                 const card = existingCard.formCard;
                 card.setSymbolAssets(this.symbolAssets);
-                card.renderCard({ dataStep, formText: this.formText });
+                card.renderCard({ dataStep, formText: this.formText, isTemplateStep });
                 this.setupDragAndDrop(existingCard, dataStep.index);
             } else {
                 const card = new FormCard(this.gameId);
                 card.setSymbolAssets(this.symbolAssets);
                 setTimeout(() => {
-                    card.renderCard({ dataStep, formText: this.formText });
+                    card.renderCard({ dataStep, formText: this.formText, isTemplateStep });
                     this.stepsList.appendChild(card.elements.card);
                     card.elements.card.formCard = card;
                     this.setupDragAndDrop(card.elements.card, dataStep.index);

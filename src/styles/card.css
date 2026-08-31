@@ -258,6 +258,14 @@
     line-height: 1;
 }
 
+.card-actions .btn-link.is-active {
+    color: #f0b429;
+}
+
+.card-actions .btn-link.is-active:hover {
+    color: #ffd666;
+}
+
 .form-card .card-body {
     padding: 0.85rem !important;
 }
