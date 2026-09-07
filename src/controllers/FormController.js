@@ -28,6 +28,7 @@ export class FormController {
         this.stepsList = document.getElementById('s_lst_steps');
         this.backButton = document.getElementById('s_btn_back');
         this.addStepButton = document.getElementById('s_btn_add');
+        this.clearTemplateButton = document.getElementById('s_btn_clearTemplate');
         this.runCheatButton = document.getElementById('s_btn_run');
         this.symbolPalette = document.getElementById('s_view_symbolPalette');
         this.symbolList = document.getElementById('s_lst_symbols');
@@ -37,6 +38,7 @@ export class FormController {
     addEventListeners() {
         this.backButton.addEventListener('click', this.handleCloseButton);
         this.addStepButton.addEventListener('click', this.handleAddStepButton);
+        this.clearTemplateButton.addEventListener('click', this.handleClearTemplateButton);
         this.runCheatButton.addEventListener('click', this.handlePlayCheat);
         this.symbolList.addEventListener('click', this.handleSymbolPaletteClick);
 
@@ -102,11 +104,13 @@ export class FormController {
         this.formData = formData;
         this.stepsList.innerHTML = "";
         this.addStepButton.style.display = 'none';
+        this.clearTemplateButton.style.display = 'none';
         this.runCheatButton.style.display = 'none';
         this.loadCheatScenario(this.gameId).then(form => {
             this.formText = form;
             this.titleText.innerHTML = this.cheatName;
             this.addStepButton.style.display = 'inline-block';
+            this.clearTemplateButton.style.display = 'inline-block';
             this.runCheatButton.style.display = 'inline-block';
             this.renderTableSteps();
         }).catch(err => {
@@ -125,6 +129,7 @@ export class FormController {
         this.formData = null;
         this.stepsList.innerHTML = "";
         this.addStepButton.style.display = 'none';
+        this.clearTemplateButton.style.display = 'none';
         this.runCheatButton.style.display = 'none';
         this.renderSymbolPalette();
     }
@@ -142,6 +147,9 @@ export class FormController {
     handleAddStepButton = () => {
         this.addNewStep();
     }
+    handleClearTemplateButton = () => {
+        this.clearStepTemplate();
+    }
     addNewStep() {
         if (!this.formText || !this.canAddData) return;
         const templateData = this._cloneStepTemplate();
@@ -149,7 +157,17 @@ export class FormController {
         this.updateSteps();
     }
     _cloneStepTemplate() {
-        return StepTemplateStore.clone();
+        return StepTemplateStore.clone(this.gameId);
+    }
+    clearStepTemplate() {
+        if (!this.gameId) return;
+        const cleared = StepTemplateStore.clear(this.gameId);
+        this.refreshTemplateIndicators();
+        if (cleared) {
+            showToast('Step template cleared for this game');
+        } else {
+            showToast('No step template set for this game');
+        }
     }
     handleCardSetTemplate(event) {
         const { index, data } = event.detail;
@@ -168,7 +186,7 @@ export class FormController {
             cloned = { ...(stepData || {}) };
         }
         delete cloned.index;
-        StepTemplateStore.save(cloned);
+        StepTemplateStore.save(this.gameId, cloned);
         this.cheatSteps[stepIndex] = { ...stepData, index: stepIndex + 1 };
         this.cheatData.cheatSteps = this.cheatSteps;
         this._db.updateData(this.cheatData).then(() => {
@@ -180,7 +198,7 @@ export class FormController {
         Array.from(this.stepsList.children).forEach((cardElement) => {
             const card = cardElement.formCard;
             if (!card) return;
-            card.setTemplateActive(StepTemplateStore.matches(card.data));
+            card.setTemplateActive(StepTemplateStore.matches(this.gameId, card.data));
         });
     }
     handleCardDuplicate(event) {
@@ -263,7 +281,7 @@ export class FormController {
 
         dataSteps.forEach((dataStep, index) => {
             const existingCard = existingCards[index];
-            const isTemplateStep = StepTemplateStore.matches(dataStep);
+            const isTemplateStep = StepTemplateStore.matches(this.gameId, dataStep);
             if (existingCard) {
                 const card = existingCard.formCard;
                 card.setSymbolAssets(this.symbolAssets);
