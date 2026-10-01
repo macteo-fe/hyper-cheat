@@ -36,6 +36,7 @@ export class FormController {
         this.symbolPalette = document.getElementById('s_view_symbolPalette');
         this.symbolList = document.getElementById('s_lst_symbols');
         this.symbolCountText = document.getElementById('s_txt_symbolCount');
+        this.toggleSymbolsButton = document.getElementById('s_btn_toggleSymbols');
         this.stepsList.innerHTML = "";
     }
     addEventListeners() {
@@ -43,7 +44,7 @@ export class FormController {
         this.addStepButton.addEventListener('click', this.handleAddStepButton);
         this.clearTemplateButton.addEventListener('click', this.handleClearTemplateButton);
         this.runCheatButton.addEventListener('click', this.handlePlayCheat);
-        this.symbolList.addEventListener('click', this.handleSymbolPaletteClick);
+        this.toggleSymbolsButton.addEventListener('click', this.handleToggleSymbols);
 
         document.addEventListener('card:duplicate', this.handleCardDuplicate.bind(this));
         document.addEventListener('card:setTemplate', this.handleCardSetTemplate.bind(this));
@@ -76,24 +77,16 @@ export class FormController {
         }
         this.symbolPalette.classList.remove('hidden');
         this.symbolList.innerHTML = codes.map((code) => `
-            <button type="button" class="symbol-chip" data-symbol="${code}" title="Click to copy ${code}">
+            <div class="symbol-chip" title="${code}">
                 <img src="${this.symbolAssets[code]}" alt="${code}" />
                 <span>${code}</span>
-            </button>
+            </div>
         `).join('');
     }
-    handleSymbolPaletteClick = async (event) => {
-        const chip = event.target.closest('.symbol-chip');
-        if (!chip) return;
-        const code = chip.dataset.symbol;
-        if (!code) return;
-        try {
-            await navigator.clipboard.writeText(code);
-            chip.classList.add('copied');
-            setTimeout(() => chip.classList.remove('copied'), 600);
-        } catch (_) {
-            // clipboard may be blocked in some DevTools contexts
-        }
+    handleToggleSymbols = () => {
+        const collapsed = this.symbolPalette.classList.toggle('is-collapsed');
+        this.toggleSymbolsButton.setAttribute('aria-expanded', String(!collapsed));
+        this.toggleSymbolsButton.title = collapsed ? 'Expand symbols' : 'Collapse symbols';
     }
     loadForm(formData) {
         const { key, gameId, cheatName } = formData;
