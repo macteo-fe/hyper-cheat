@@ -298,3 +298,65 @@
     color: #fff;
     cursor: pointer;
 }
+
+/* New BE cheat format (e.g. 9824) */
+.form-card.is-new-format .leftDiv {
+    font-size: 0.86rem;
+}
+
+.new-cheat-format .new-cheat-lede {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin: 0 0 0.75rem;
+}
+
+.new-cheat-format .new-cheat-section {
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.new-cheat-format .new-cheat-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.new-cheat-format h4 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin: 0 0 0.45rem;
+}
+
+.new-cheat-format p {
+    margin: 0 0 0.45rem;
+}
+
+.new-cheat-format label {
+    font-weight: 600;
+}
+
+.new-cheat-format .new-cheat-wide,
+.new-cheat-format input.new-cheat-wide,
+.new-cheat-format select.new-cheat-wide {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-top: 0.2rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+}
+
+.new-cheat-format .new-cheat-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+}
+
+.new-cheat-format code {
+    font-family: var(--mono);
+    font-size: 0.75em;
+}

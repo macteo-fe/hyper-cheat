@@ -1,5 +1,6 @@
 import { FormCard } from '../models/FormCard.js';
 import { StepTemplateStore } from '../utils/stepTemplate.js';
+import { adaptCheatFormHtml } from '../utils/newCheatFormat.js';
 import { showToast } from '../utils/toast.js';
 
 export class FormController {
@@ -15,6 +16,8 @@ export class FormController {
         this.gameId = null;
         this.cheatName = null;
         this.formText = '';
+        this.cheatFormat = 'legacy';
+        this.scenarios = null;
         this.cheatData = {};
         this.cheatSteps = [];
         this.canAddData = false;
@@ -98,6 +101,8 @@ export class FormController {
         this.gameId = gameId;
         this.cheatName = cheatName;
         this.formText = '';
+        this.cheatFormat = 'legacy';
+        this.scenarios = null;
         this.cheatData = {};
         this.cheatSteps = [];
         this.canAddData = false;
@@ -106,8 +111,10 @@ export class FormController {
         this.addStepButton.style.display = 'none';
         this.clearTemplateButton.style.display = 'none';
         this.runCheatButton.style.display = 'none';
-        this.loadCheatScenario(this.gameId).then(form => {
-            this.formText = form;
+        this.loadCheatScenario(this.gameId).then(({ formHtml, format, scenarios }) => {
+            this.formText = formHtml;
+            this.cheatFormat = format;
+            this.scenarios = scenarios;
             this.titleText.innerHTML = this.cheatName;
             this.addStepButton.style.display = 'inline-block';
             this.clearTemplateButton.style.display = 'inline-block';
@@ -123,6 +130,8 @@ export class FormController {
         this.gameId = null;
         this.cheatName = null;
         this.formText = '';
+        this.cheatFormat = 'legacy';
+        this.scenarios = null;
         this.cheatData = {};
         this.cheatSteps = [];
         this.canAddData = false;
@@ -285,13 +294,25 @@ export class FormController {
             if (existingCard) {
                 const card = existingCard.formCard;
                 card.setSymbolAssets(this.symbolAssets);
-                card.renderCard({ dataStep, formText: this.formText, isTemplateStep });
+                card.renderCard({
+                    dataStep,
+                    formText: this.formText,
+                    isTemplateStep,
+                    cheatFormat: this.cheatFormat,
+                    scenarios: this.scenarios,
+                });
                 this.setupDragAndDrop(existingCard, dataStep.index);
             } else {
                 const card = new FormCard(this.gameId);
                 card.setSymbolAssets(this.symbolAssets);
                 setTimeout(() => {
-                    card.renderCard({ dataStep, formText: this.formText, isTemplateStep });
+                    card.renderCard({
+                        dataStep,
+                        formText: this.formText,
+                        isTemplateStep,
+                        cheatFormat: this.cheatFormat,
+                        scenarios: this.scenarios,
+                    });
                     this.stepsList.appendChild(card.elements.card);
                     card.elements.card.formCard = card;
                     this.setupDragAndDrop(card.elements.card, dataStep.index);
@@ -319,7 +340,8 @@ export class FormController {
         const inputUrl = `${apiUrl}${gameId}/inputdata`;
         const response = await fetch(inputUrl);
         if (response.ok) {
-            return await response.text();
+            const rawHtml = await response.text();
+            return adaptCheatFormHtml(rawHtml, gameId);
         } else {
             throw new Error('Failed to load cheat scenario');
         }

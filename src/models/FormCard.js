@@ -1,9 +1,17 @@
+import {
+    asMatrixData,
+    findScenario,
+    inferTableFormat,
+} from '../utils/newCheatFormat.js';
+
 export class FormCard {
     constructor(gameId) {
         this.gameId = gameId;
         this.index = 0;
         this.data = {};
         this.formText = '';
+        this.cheatFormat = 'legacy';
+        this.scenarios = null;
         this.isRender = false;
         this.isCollapsed = true;
         this.symbolAssets = {};
@@ -166,14 +174,25 @@ export class FormCard {
 
     //render card
     renderCard(data) {
-        const { dataStep, formText, isTemplateStep = false } = data;
+        const {
+            dataStep,
+            formText,
+            isTemplateStep = false,
+            cheatFormat = 'legacy',
+            scenarios = null,
+        } = data;
         this.index = dataStep.index;
         this.data = dataStep;
         this.formText = formText;
+        this.cheatFormat = cheatFormat || 'legacy';
+        this.scenarios = scenarios || null;
         this.isRender = true;
 
         this.elements.body.leftDiv.container.innerHTML = "";
         this.elements.body.rightDiv.container.innerHTML = "";
+        this.elements.card.classList.toggle('is-new-format', this.cheatFormat === 'new');
+        this.elements.body.leftDiv.container.style.width = this.cheatFormat === 'new' ? '58%' : '50%';
+        this.elements.body.rightDiv.container.style.width = this.cheatFormat === 'new' ? '42%' : '50%';
         this.updateHeader();
         this.updateLeftDiv();
         this.updateRightDiv();
@@ -193,15 +212,25 @@ export class FormCard {
         const userId = this.elements.body.leftDiv.container.querySelector(`[name="userId"]`);
         if (userId && userId.parentNode) userId.parentNode.style.display = "none";
         Object.entries(this.data).forEach(([key, value]) => {
-            const element = this.elements.body.leftDiv.container.querySelector(`#${key}`)
-                || this.elements.body.leftDiv.container.querySelector(`[name=${key}]`);
-            if (element) element.value = value;
+            const element = this.elements.body.leftDiv.container.querySelector(`#${CSS.escape(key)}`)
+                || this.elements.body.leftDiv.container.querySelector(`[name="${CSS.escape(key)}"]`);
+            if (!element) return;
+            if (element.type === 'checkbox') {
+                element.checked = value === element.value || value === true || value === '1' || value === 'true';
+            } else {
+                element.value = value;
+            }
         });
         this._setupInputHandlers(this.elements.body.leftDiv.container);
         this._removeSubmitButtons(this.elements.body.leftDiv.container);
         this._bindAutoSubmit(this.elements.body.leftDiv.container);
     }
     _setupInputHandlers(leftDiv) {
+        if (this.cheatFormat === 'new' || leftDiv.querySelector('[data-cheat-format="new"]')) {
+            this.initNewFormatForm(leftDiv);
+            return;
+        }
+
         const tableE = Array.from(leftDiv.getElementsByTagName("table"));
         const hasTableMatrixE = tableE.some(table => table.id === "tableMatrix");
         const textAreE = Array.from(leftDiv.getElementsByTagName("textarea"));
@@ -231,6 +260,55 @@ export class FormCard {
         this.elements.body.leftDiv.submitButton = null;
     }
 
+    initNewFormatForm(container) {
+        const inputs = Array.from(container.querySelectorAll('input, select, textarea'));
+        this.elements.body.leftDiv.inputs = inputs.filter((el) => el.matches('input'));
+        this.elements.body.leftDiv.selects = inputs.filter((el) => el.matches('select'));
+        this.elements.body.leftDiv.submitButton = null;
+
+        const matrixInput = container.querySelector('#matrixData');
+        const seedSelect = container.querySelector('#seedFrom');
+        const gridFormat = container.querySelector('#gridFormat');
+        const clearBtn = container.querySelector('#clearGrid');
+
+        const refreshPreview = () => {
+            this.updateRightDiv(true);
+            this.updateSummary();
+        };
+
+        seedSelect?.addEventListener('change', () => {
+            const value = seedSelect.value || '';
+            if (!value || !this.scenarios) return;
+            const [pool, id] = value.split(':');
+            const scenario = findScenario(this.scenarios, pool, id);
+            if (!scenario || !matrixInput) return;
+            matrixInput.value = asMatrixData(scenario);
+            if (gridFormat) {
+                const format = Array(scenario.reels).fill(String(scenario.rows)).join(',');
+                const hasOption = Array.from(gridFormat.options).some((opt) => opt.value === format);
+                gridFormat.value = hasOption ? format : '';
+            }
+            seedSelect.value = '';
+            refreshPreview();
+            this._handleSubmit(this._getFormFields(container), true);
+        });
+
+        clearBtn?.addEventListener('click', () => {
+            if (matrixInput) matrixInput.value = '';
+            const cellData = container.querySelector('#matrixCellData');
+            const refill = container.querySelector('#powerUpSymbolCode');
+            if (cellData) cellData.value = '';
+            if (refill) refill.value = '';
+            if (gridFormat) gridFormat.value = '';
+            if (seedSelect) seedSelect.value = '';
+            refreshPreview();
+            this._handleSubmit(this._getFormFields(container), true);
+        });
+
+        gridFormat?.addEventListener('change', refreshPreview);
+        matrixInput?.addEventListener('input', refreshPreview);
+    }
+
     _removeSubmitButtons(container) {
         if (!container) return;
         container.querySelectorAll('input[type="submit"], button[type="submit"], #submitBtn').forEach((el) => {
@@ -243,9 +321,9 @@ export class FormCard {
     _getFormFields(container) {
         if (!container) return [];
         return [
-            ...container.querySelectorAll('input:not([type="submit"]):not([type="button"])'),
-            ...container.querySelectorAll('select'),
-            ...container.querySelectorAll('textarea'),
+            ...container.querySelectorAll('input:not([type="submit"]):not([type="button"]):not([data-local])'),
+            ...container.querySelectorAll('select:not([data-local])'),
+            ...container.querySelectorAll('textarea:not([data-local])'),
         ];
     }
 
@@ -295,7 +373,17 @@ export class FormCard {
     _collectData(inputs) {
         const data = {};
         inputs.forEach((input) => {
-            if (input.name && input.value) {
+            if (!input.name || input.dataset?.local === '1') return;
+
+            if (input.type === 'checkbox') {
+                if (input.checked) data[input.name] = input.value || '1';
+                return;
+            }
+            if (input.type === 'radio') {
+                if (input.checked && input.value) data[input.name] = input.value;
+                return;
+            }
+            if (input.value) {
                 data[input.name] = input.value;
                 if ((this.gameId == '9868' || this.gameId == '9864') && input.name == 'stackedReel1' && input.value == '0') {
                     delete data[input.name];
@@ -327,11 +415,13 @@ export class FormCard {
     }
 
     _getFormFieldDisplay(key, value, formCheat) {
-        const element = formCheat.querySelector(`#${key}`) || formCheat.querySelector(`[name="${key}"]`);
+        const element = formCheat.querySelector(`#${CSS.escape(key)}`) || formCheat.querySelector(`[name="${CSS.escape(key)}"]`);
         const label = element?.parentNode?.innerText?.trim() || key;
         let valueColor = 'var(--success)';
         if (key === 'matrixData') {
-            const format = this.data.tableFormat || this.data.megaSymbolCode;
+            const format = this.data.tableFormat
+                || this.data.megaSymbolCode
+                || inferTableFormat(value, this.scenarios);
             valueColor = this._checkMatrix(value, format) ? 'var(--success)' : 'var(--danger)';
         }
         return { label, valueColor };
@@ -375,17 +465,27 @@ export class FormCard {
         const left = this.elements.body?.leftDiv?.container;
         const liveMatrix = left?.querySelector?.('#matrixData, textarea[name="matrixData"], input[name="matrixData"]')?.value;
         const liveFormat = left?.querySelector?.('#tableFormat, input[name="tableFormat"], textarea[name="tableFormat"]')?.value;
+        const liveGridFormat = left?.querySelector?.('#gridFormat')?.value;
         const liveMega = left?.querySelector?.('#megaSymbolCode, input[name="megaSymbolCode"]')?.value;
 
         let matrixData = (liveMatrix ?? this.data?.matrixData ?? '').toString().trim();
         let tableFormat = (liveFormat ?? this.data?.tableFormat ?? '').toString().trim();
 
-        if (this.gameId === '9833') {
+        if (!tableFormat && liveGridFormat) {
+            tableFormat = liveGridFormat.toString().trim();
+        }
+
+        // New-format free-game scenarios reuse megaSymbolCode as scenario id — not a table format.
+        if (this.cheatFormat !== 'new' && this.gameId === '9833') {
             tableFormat = (liveMega ?? this.data?.megaSymbolCode ?? tableFormat ?? '').toString().trim();
         }
 
         if (!tableFormat) {
             tableFormat = this._getDefaultTableFormatFromFormText() || '';
+        }
+
+        if (!tableFormat) {
+            tableFormat = inferTableFormat(matrixData, this.scenarios) || '';
         }
 
         if (!matrixData) matrixData = null;
