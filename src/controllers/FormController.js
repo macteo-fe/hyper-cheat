@@ -626,7 +626,6 @@ export class FormController {
         } catch {
             // In-memory copy still works within the extension
         }
-        showToast(`Copied ${steps.length} step${steps.length > 1 ? 's' : ''}`);
     }
     async _readClipboardSteps() {
         if (this._copiedSteps?.length) {
@@ -657,7 +656,6 @@ export class FormController {
 
         this._pendingSelectedIndices = clones.map((_, i) => insertAt + i);
         this.updateSteps();
-        showToast(`Pasted ${clones.length} step${clones.length > 1 ? 's' : ''}`);
     }
     async loadCheatScenario(gameId) {
         const stagingUrl = `https://cheat.staging.enostd.gay/`;
