@@ -702,3 +702,43 @@ a:hover {
     color: #fca5a5;
 }
 
+.app-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.app-confirm-dialog {
+    width: min(360px, 100%);
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg-panel);
+    color: var(--text);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.app-confirm-title {
+    margin: 0 0 0.45rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.app-confirm-message {
+    margin: 0 0 1rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.app-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+

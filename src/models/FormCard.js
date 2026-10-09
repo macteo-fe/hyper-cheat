@@ -53,10 +53,8 @@ export class FormCard {
                 }
             }
         };
-        setTimeout(() => {
-            this.appendElements();
-            this.addEventListeners();
-        }, 0);
+        this.appendElements();
+        this.addEventListeners();
     }
 
     // Create card element
@@ -149,6 +147,9 @@ export class FormCard {
     }
     _handleHeaderClick(event) {
         if (event.target.tagName === 'BUTTON') return;
+        if (event.target.closest('.card-actions')) return;
+        // Selection modifiers / drag-select should not toggle expand
+        if (event.ctrlKey || event.metaKey || event.shiftKey) return;
         this.setCollapsed(!this.isCollapsed);
     }
     setCollapsed(collapsed) {
