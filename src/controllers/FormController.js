@@ -33,18 +33,28 @@ export class FormController {
         this.addStepButton = document.getElementById('s_btn_add');
         this.clearTemplateButton = document.getElementById('s_btn_clearTemplate');
         this.runCheatButton = document.getElementById('s_btn_run');
-        this.symbolPalette = document.getElementById('s_view_symbolPalette');
-        this.symbolList = document.getElementById('s_lst_symbols');
-        this.symbolCountText = document.getElementById('s_txt_symbolCount');
-        this.toggleSymbolsButton = document.getElementById('s_btn_toggleSymbols');
+        this.symbolPalettes = [
+            this._createSymbolPaletteRefs('s'),
+            this._createSymbolPaletteRefs('m'),
+        ].filter((palette) => palette.root && palette.list && palette.count && palette.toggle);
         this.stepsList.innerHTML = "";
+    }
+    _createSymbolPaletteRefs(prefix) {
+        return {
+            root: document.getElementById(`${prefix}_view_symbolPalette`),
+            list: document.getElementById(`${prefix}_lst_symbols`),
+            count: document.getElementById(`${prefix}_txt_symbolCount`),
+            toggle: document.getElementById(`${prefix}_btn_toggleSymbols`),
+        };
     }
     addEventListeners() {
         this.backButton.addEventListener('click', this.handleCloseButton);
         this.addStepButton.addEventListener('click', this.handleAddStepButton);
         this.clearTemplateButton.addEventListener('click', this.handleClearTemplateButton);
         this.runCheatButton.addEventListener('click', this.handlePlayCheat);
-        this.toggleSymbolsButton.addEventListener('click', this.handleToggleSymbols);
+        this.symbolPalettes.forEach((palette) => {
+            palette.toggle.addEventListener('click', () => this.handleToggleSymbols(palette));
+        });
 
         document.addEventListener('card:duplicate', this.handleCardDuplicate.bind(this));
         document.addEventListener('card:setTemplate', this.handleCardSetTemplate.bind(this));
@@ -69,24 +79,32 @@ export class FormController {
     }
     renderSymbolPalette() {
         const codes = Object.keys(this.symbolAssets || {}).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-        this.symbolCountText.textContent = String(codes.length);
-        if (!codes.length) {
-            this.symbolPalette.classList.add('hidden');
-            this.symbolList.innerHTML = '';
-            return;
-        }
-        this.symbolPalette.classList.remove('hidden');
-        this.symbolList.innerHTML = codes.map((code) => `
+        const chipsHtml = codes.length
+            ? codes.map((code) => `
             <div class="symbol-chip" title="${code}">
                 <img src="${this.symbolAssets[code]}" alt="${code}" />
                 <span>${code}</span>
             </div>
-        `).join('');
+        `).join('')
+            : '';
+
+        this.symbolPalettes.forEach((palette) => {
+            palette.count.textContent = String(codes.length);
+            if (!codes.length) {
+                palette.root.classList.add('hidden');
+                palette.list.innerHTML = '';
+                return;
+            }
+            palette.root.classList.remove('hidden');
+            palette.list.innerHTML = chipsHtml;
+        });
     }
-    handleToggleSymbols = () => {
-        const collapsed = this.symbolPalette.classList.toggle('is-collapsed');
-        this.toggleSymbolsButton.setAttribute('aria-expanded', String(!collapsed));
-        this.toggleSymbolsButton.title = collapsed ? 'Expand symbols' : 'Collapse symbols';
+    handleToggleSymbols = (palette) => {
+        const target = palette || this.symbolPalettes[0];
+        if (!target) return;
+        const collapsed = target.root.classList.toggle('is-collapsed');
+        target.toggle.setAttribute('aria-expanded', String(!collapsed));
+        target.toggle.title = collapsed ? 'Expand symbols' : 'Collapse symbols';
     }
     loadForm(formData) {
         const { key, gameId, cheatName } = formData;

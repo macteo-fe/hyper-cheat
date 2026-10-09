@@ -44,6 +44,16 @@
                     <button type="button" class="btn btn-warning btn-ghost" id="m_btn_reload">Reload</button>
                 </div>
             </div>
+            <div id="m_view_symbolPalette" class="symbol-palette hidden">
+                <button type="button" class="symbol-palette-toggle" id="m_btn_toggleSymbols" aria-expanded="true" title="Collapse symbols">
+                    <span class="symbol-palette-toggle-left">
+                        <span class="symbol-palette-chevron" aria-hidden="true">▾</span>
+                        <span>Symbols</span>
+                    </span>
+                    <span id="m_txt_symbolCount" class="symbol-palette-count">0</span>
+                </button>
+                <div id="m_lst_symbols" class="symbol-palette-list"></div>
+            </div>
         </div>
 
         <div class="content content-m-table" id="m_tbl_cheat">
